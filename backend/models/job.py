@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Float, JSON, Enum as S
 from sqlalchemy.sql import func
 from datetime import datetime
 from enum import Enum
-from .database import Base
+from .database import base
 
 class JobStatus(str, Enum):
     PENDING = "pending"      
@@ -12,11 +12,11 @@ class JobStatus(str, Enum):
     TIMEOUT = "timeout"      
     RETRYING = "retrying"    
 
-class Job(Base):
+class Job(base):
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True, index=True)
-    job_type = Column(String, nullabke=False, index=True)
+    job_type = Column(String, nullable=False, index=True)
     user_id = Column(String, nullable=False, index=True)
 
     config = Column(JSON, nullable=False)

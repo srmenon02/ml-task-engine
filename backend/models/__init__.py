@@ -1,16 +1,16 @@
-from .database import Base, engine, get_db, SessionLocal
+from .database import engine, get_db, base, local_session
 from .job import Job, JobStatus
 from .execution import Execution
 from .resource_profile import ResourceProfile
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    base.metadata.create_all(bind=engine)
 
     __all__ = [
-        "Base",
+        "base",
         "engine",
         "get_db",
-        "SessionLocal",
+        "local_session",
         "Job",
         "JobStatus",
         "Execution",

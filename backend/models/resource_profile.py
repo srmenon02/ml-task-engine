@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float, JSON, DateTime
 from sqlalchemy.sql import func
-from .database import Base
+from .database import base
 
-class ResourceProfile(Base):
+class ResourceProfile(base):
     __tablename__ = "resource_profiles"
 
     id = Column(Integer, primary_key=True, index=True) 

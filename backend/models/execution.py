@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey
 from sqlalchemy.sql import func
-from .database import Base
+from .database import base
 
-class Execution(Base):
+class Execution(base):
     __tablename__ = "execution"
 
     id = Column(Integer, primary_key=True, index=True)
