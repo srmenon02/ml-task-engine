@@ -1,6 +1,0 @@
-curl -X POST https://localhost:8000/jobs \
-    -H "Content-Type: application/json" \
-    -d '{
-        "job_type": "train_sklearn_model",
-        "config": {"model", "RF", "n_estimators": 100}
-    }'
