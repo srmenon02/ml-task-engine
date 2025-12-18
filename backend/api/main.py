@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import structlog
 import sys
 from pathlib import Path
@@ -9,6 +9,7 @@ from datetime import datetime
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
+from workers.tasks import execute_job
 from models import get_db, Job, JobStatus
 from pydantic import BaseModel
 
@@ -44,6 +45,7 @@ class JobResponse(BaseModel):
     status: JobStatus
     config: dict
     created_at: datetime
+    results: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -69,11 +71,13 @@ def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
 
     logger.info("job.created", job_id=job.id)
 
+    execute_job.delay(job.id)
+
     return job
 
 @app.get("/jobs/{job_id}", response_model=JobResponse)
 def get_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(Job).filter(Job.id == job.id).first()
+    job = db.query(Job).filter(Job.id == job_id).first()
 
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
