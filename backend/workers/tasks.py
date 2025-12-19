@@ -6,6 +6,7 @@ import time
 import traceback
 from typing import Dict, Any
 
+from core.training_scheduler import get_training_scheduler
 from workers.celery_app import celery_app
 from models import local_session, Job, JobStatus, Execution, ResourceProfile
 
@@ -91,6 +92,9 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
         db.commit()
 
         _store_resource_profile(db, job, execution, execution_time)
+
+        scheduler = get_training_scheduler()
+        scheduler.check_and_retrain()
 
         logger.info(
             "Task Completed",

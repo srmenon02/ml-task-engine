@@ -12,6 +12,8 @@ sys.path.insert(0, str(backend_dir))
 from workers.tasks import execute_job
 from models import get_db, Job, JobStatus
 from pydantic import BaseModel
+from core.predictor import get_predictor
+from core.accuracy_tracker import calculate_prediction_accuracy
 
 logger = structlog.get_logger()
 
@@ -46,6 +48,8 @@ class JobResponse(BaseModel):
     config: dict
     created_at: datetime
     results: Optional[dict] = None
+    predicted_memory_db: float = None
+    predicted_cpu_percent: float = None
 
     class Config:
         from_attributes = True
@@ -58,20 +62,35 @@ def health_check():
 def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
 
+    predictor = get_predictor()
+    predicted_memory, predicted_cpu = predictor.predict(
+        job_data.config,
+        job_data.job_type
+    )
+
+    logger.info(
+        "job resources predicted",
+        memory_mb = predicted_memory,
+        cpu_percent = predicted_cpu,
+    )
+
     job = Job(
         job_type=job_data.job_type,
         config=job_data.config,
         user_id=job_data.user_id,
         status=JobStatus.PENDING,
+        predicted_memory_db = predicted_memory,
+        predicted_cpu_percent = predicted_cpu,
     )
 
     db.add(job)
     db.commit()
     db.refresh(job)
 
-    logger.info("job.created", job_id=job.id)
-
+    logger.info("job.created", job_id=job.id, predicted_memory_db=job.predicted_memory_db, predicted_cpu_percent=job.predicted_cpu_percent)
     execute_job.delay(job.id)
+
+    logger.info("job queued", job_id = job.id)
 
     return job
 
@@ -100,6 +119,31 @@ def list_job(
     jobs = query.order_by(Job.created_at.desc()).limit(jobs_limit).all()
 
     return jobs
+
+@app.post("/predictor/train")
+def train_predictor():
+    predictor = get_predictor()
+    success = predictor.train(min_samples=5)
+
+    if success:
+        return {
+            "status": "success",
+            "message": "predictor trained",
+            "training samples": predictor.training_samples,
+        }
+    return {
+        "status": "failed",
+        "message": "Need at least 5 completed jobs for training data"
+    }
+
+@app.get("/predictor/evaluate")
+def evaluate_predictor():
+    predictor = get_predictor()
+    return predictor.evaluate()
+
+@app.get("/prediction/accuracy")
+def get_prediction_accuracy():
+    return calculate_prediction_accuracy()
 
 if __name__ == "__main__": 
     import uvicorn
