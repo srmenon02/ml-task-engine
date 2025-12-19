@@ -19,8 +19,6 @@ class ResourcePredictor:
         self.memory_model = Ridge(alpha=1.0)
         self.cpu_model = Ridge(alpha=1.0)
         self.scaler = StandardScaler()
-
-
         self.is_trained = False
         self.training_samples = 0
 
@@ -53,11 +51,11 @@ class ResourcePredictor:
         try:
             features_scaled = self.scaler.transform(features)
 
-            memory_mb = max(memory_mb, 50.0)
-            cpu_percent = max(min(cpu_percent, 100.0), 1.0)
+            memory_mb = self.memory_model.predict(features_scaled)[0]
+            cpu_percent = self.cpu_model.predict(features_scaled)[0]
 
             logger.info(
-                "predictor,predicted",
+                "predictor predicted",
                 memory_mb = memory_mb,
                 cpu_percent = cpu_percent,
                 training_samples = self.training_samples,
@@ -154,7 +152,7 @@ class ResourcePredictor:
 
             X = np.array(X)
             y_memory_true = np.array(y_memory_true)
-            y_cpu = np.array(y_cpu)
+            y_cpu_true = np.array(y_cpu_true)
 
             X_scaled = self.scaler.transform(X)
             y_memory_pred = self.memory_model.predict(X_scaled)
@@ -168,14 +166,14 @@ class ResourcePredictor:
 
             return {
                 "memory_mae_mb" : float(memory_mae),
-                "memory_mae_percent": float(memory_mape),
+                "memory_mape_percent": float(memory_mape),
                 "cpu_mae_percent": float(cpu_mae),
                 "cpu_mape_percent": float(cpu_mape),
                 "samples": len(profiles),
             }
 
         except Exception as e:
-            logger.error("predictor evlautor failed", str(e))
+            logger.error(f"predictor evalutor failed: {e}")
             return {"error": str(e)}
         
         finally: 
@@ -234,7 +232,5 @@ class ResourcePredictor:
 
 def get_predictor() -> ResourcePredictor:
     global _predictor
-    if not _predictor:
-        _predictor = ResourcePredictor
-    return _predictor
+    return _predictor if _predictor else ResourcePredictor()
 
