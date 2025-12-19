@@ -26,7 +26,7 @@ class ResourcePredictor:
             self.model_path = Path(model_path)
             self.model_path.mkdir(parents=True, exist_ok=True)
         else:
-            self.model_path = Path("models/saved")
+            self.model_path = Path(__file__).parent / "saved_models"
             self.model_path.mkdir(parents=True, exist_ok=True)
         
         self._load_models()
@@ -64,7 +64,7 @@ class ResourcePredictor:
             return memory_mb, cpu_percent
 
         except Exception as e:
-            logger.error("prediction.prediction failed", error=str(e))
+            logger.error(f"prediction.prediction failed {e}")
             return self._get_conservative_estimate(job_config)
         
     def train(self, min_samples: int = 10) -> bool:
@@ -118,7 +118,7 @@ class ResourcePredictor:
             return True
         
         except Exception as e:
-            logger.error("prediction training failed", error=str(e))
+            logger.error(f"prediction training failed {e}")
             return False
         
         finally:
@@ -202,10 +202,10 @@ class ResourcePredictor:
             joblib.dump(self.cpu_model, self.model_path / "cpu_model.pkl")
             joblib.dump(self.scaler, self.model_path / "scaler.pkl")
 
-            logger.info("predictor moodels saved", error = str(e))
+            logger.info("predictor moodels saved")
 
         except Exception as e:
-            logger.error("predictor save failed", error=str(e))
+            logger.error(f"predictor save failed {e}")
 
     def _load_models(self):
         try:
@@ -213,24 +213,26 @@ class ResourcePredictor:
             cpu_path = self.model_path / "cpu_model.pkl"
             scaler_path = self.model_path / "scaler.pkl"
 
-            if not memory_path.exists():
-                logger.info("no saved memory models")
-            elif not cpu_path.exists():
-                logger.info("no saved cpu models")
-            elif not scaler_path.exists():
-                logger.info("no saved scalers")
-            else:
+            if memory_path.exists() and cpu_path.exists() and scaler_path.exists():
                 self.memory_model = joblib.load(memory_path)
                 self.cpu_model = joblib.load(cpu_path)
-                self.scaler= joblib.load(scaler_path)
+                self.scaler = joblib.load(scaler_path)
                 self.is_trained = True
 
                 logger.info("predictor models_loaded", path=str(self.model_path))
+            else:
+                logger.info("no saved models found", 
+                    memory_exists=memory_path.exists(),
+                    cpu_exists=cpu_path.exists(),
+                    scaler_exists=scaler_path.exists()
+                )
 
         except Exception as e:
-            logger.error("predictor load models failed", error=str(e))
+            logger.error(f"predictor load models failed {e}")
 
 def get_predictor() -> ResourcePredictor:
     global _predictor
-    return _predictor if _predictor else ResourcePredictor()
+    if _predictor is None:
+        _predictor = ResourcePredictor()
+    return _predictor
 

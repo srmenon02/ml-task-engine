@@ -48,8 +48,8 @@ class JobResponse(BaseModel):
     config: dict
     created_at: datetime
     results: Optional[dict] = None
-    predicted_memory_db: float = None
-    predicted_cpu_percent: float = None
+    predicted_memory_db: Optional[float] = None
+    predicted_cpu_percent: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -141,7 +141,7 @@ def evaluate_predictor():
     predictor = get_predictor()
     return predictor.evaluate()
 
-@app.get("/prediction/accuracy")
+@app.get("/predictor/accuracy")
 def get_prediction_accuracy():
     return calculate_prediction_accuracy()
 

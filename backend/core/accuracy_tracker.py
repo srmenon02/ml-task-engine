@@ -48,7 +48,7 @@ def calculate_prediction_accuracy() -> Dict:
         }
             
     except Exception as e:
-        logger.error("Accuracy Tracker error", error=str(e))
+        logger.error(f"Accuracy Tracker error {e}")
         return {"error": str(e)}
     
     finally:

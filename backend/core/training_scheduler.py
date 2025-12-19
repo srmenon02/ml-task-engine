@@ -35,11 +35,13 @@ class TrainingScheduler:
 
 
         except Exception as e:
-            logger.error("training scheduler error", str(e))
+            logger.error(f"training scheduler error {e}")
         finally:
             db.close()
 
 _scheduler = None
 def get_training_scheduler() -> TrainingScheduler:
     global _scheduler
-    return _scheduler if _scheduler else TrainingScheduler(retrain_interval = 10)
+    if _scheduler is None:
+        _scheduler = TrainingScheduler(retrain_interval=10)
+    return _scheduler
