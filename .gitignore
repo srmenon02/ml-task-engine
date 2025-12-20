@@ -37,3 +37,7 @@ Thumbs.db
 EOF
 
 ml_task_engine_guide.md
+setup-guides
+backend/models/saved/
+backend/core/test_predictor_script.txt
+ml-task-engine.zip
