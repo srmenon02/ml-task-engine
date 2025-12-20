@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 import joblib
 import structlog
 from pathlib import Path
+import os
 
 from core.feature_engineering import FeatureExtractor
 from models import local_session, ResourceProfile
