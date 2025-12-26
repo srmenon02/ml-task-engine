@@ -10,7 +10,14 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"  
     FAILED = "failed"        
     TIMEOUT = "timeout"      
-    RETRYING = "retrying"    
+    RETRYING = "retrying"
+    CANCELLED = "cancelled"  
+
+class JobPriority(int, Enum):
+    LOW = 0
+    NORMAL = 5
+    HIGH = 10
+    URGENT = 20  
 
 class Job(base):
     __tablename__ = "jobs"
@@ -21,11 +28,19 @@ class Job(base):
 
     config = Column(JSON, nullable=False)
 
+    priority = Column(Integer, default=JobPriority.NORMAL.value, nullable=False, index=True)
+
     predicted_cpu_percent = Column(Float, nullable=True)
     predicted_memory_db = Column(Float, nullable=True)
 
+    max_memory_mb = Column(Float, nullable=True)
+    max_execution_time_sec = Column(Integer, default=3600, nullable=False)
+
     status = Column(SQLEnum(JobStatus), default = JobStatus.PENDING, nullable = False, index = True)
     error_msg = Column(String, nullable = True)
+
+    cancelled_by = Column(String, nullable=True)
+    cancceled_at = Column(DateTime, nullable=True)
 
     results = Column(JSON, nullable = True)
 

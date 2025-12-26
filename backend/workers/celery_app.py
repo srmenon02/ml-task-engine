@@ -20,6 +20,12 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100,
     broker_connection_retry_on_startup=True,
+
+    task_default_priority = 5,
+    broker_transport_options = {
+        'priority_steps': list(range(21)),
+        'queue_order_strategy': 'priority',
+    }
 )
 
 celery_app.autodiscover_tasks(['workers'])
