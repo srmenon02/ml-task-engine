@@ -1,5 +1,5 @@
 from .database import engine, get_db, base, local_session
-from .job import Job, JobStatus
+from .job import Job, JobStatus, JobPriority
 from .execution import Execution
 from .resource_profile import ResourceProfile
 
