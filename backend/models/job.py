@@ -40,7 +40,7 @@ class Job(base):
     error_msg = Column(String, nullable = True)
 
     cancelled_by = Column(String, nullable=True)
-    cancceled_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
 
     results = Column(JSON, nullable = True)
 
