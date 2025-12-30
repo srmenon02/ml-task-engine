@@ -56,7 +56,7 @@ class JobScheduler:
             
             job.status = JobStatus.CANCELLED
             job.cancelled_by = cancelled_by
-            job.cancceled_at = datetime.now()
+            job.cancelled_at = datetime.now()
             db.commit()
 
             if job.status == JobStatus.RUNNING:
@@ -78,7 +78,7 @@ class JobScheduler:
 
 _scheduler = None
 
-def _get_scheduler() -> JobScheduler:
+def get_scheduler() -> JobScheduler:
     global _scheduler
     if not _scheduler:
         _scheduler = JobScheduler()
