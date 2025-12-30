@@ -45,7 +45,7 @@ class JobScheduler:
             if not job:
                 logger.error("Scheduler.job not found", job_id = job_id)
                 return False
-            if job.status in [JobStatus.COMPLETED, JobStatus.CANCELLED]:
+            if job.status in [JobStatus.COMPLETED, JobStatus.CANCELED]:
                 logger.warning(
                     "Cannot cancel job",
                     job_id = job.id,
@@ -54,7 +54,7 @@ class JobScheduler:
 
                 return False
             
-            job.status = JobStatus.CANCELLED
+            job.status = JobStatus.CANCELED
             job.cancelled_by = cancelled_by
             job.cancelled_at = datetime.now()
             db.commit()
