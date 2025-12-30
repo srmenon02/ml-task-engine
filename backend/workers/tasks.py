@@ -200,6 +200,7 @@ def _execute_job_with_limits(
 ) -> Dict[str, Any]:
     stop_monitoring = threading.Event()
     memory_exceeded = threading.Event()
+    baseline_rss = process.memory_info().rss
 
     def monitor_resources():
         monitor_db = local_session()
@@ -210,25 +211,24 @@ def _execute_job_with_limits(
                     if monitor_job and monitor_job.status == JobStatus.CANCELED:
                         logger.info("task cancelled during execution", job_id = job_snapshot["id"])
                         stop_monitoring.set()
-                        os.kill(os.getpid(), signal.SIGTERM)
-                        break
+                        raise MemoryError("Job canclled during Execution")
 
                     cpu_samples.append(process.cpu_percent(interval=0.1))
                     mem_info = process.memory_info()
                     memory_samples.append(mem_info.rss)
 
-                    memory_mb = mem_info.rss / (1024 * 1024)
-                    if job_snapshot["max_memory_mb"] and memory_mb > job_snapshot["max_memory_mb"]:
+                    current_rss = process.memory_info().rss
+                    delta_mb = (current_rss - baseline_rss) / (1024 * 1024)
+                    if job_snapshot["max_memory_mb"] and delta_mb > job_snapshot["max_memory_mb"]:
                         logger.error(
                             "task.memory_limit execeeded",
                             job_id = job_snapshot["id"],
-                            current_mb = memory_mb,
+                            current_mb = delta_mb,
                             limit_mb = job_snapshot["max_memory_mb"],
                         )
                         memory_exceeded.set()
                         stop_monitoring.set()
-                        os.kill(os.getpid(), signal.SIGTERM)
-                        break
+                        raise MemoryError("Job exceeded memory limit")
 
                     time.sleep(0.5)
                 except Exception as e:
