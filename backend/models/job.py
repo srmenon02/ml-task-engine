@@ -11,7 +11,7 @@ class JobStatus(str, Enum):
     FAILED = "failed"        
     TIMEOUT = "timeout"      
     RETRYING = "retrying"
-    CANCELLED = "cancelled"  
+    CANCELED = "cancelled"  
 
 class JobPriority(int, Enum):
     LOW = 0
