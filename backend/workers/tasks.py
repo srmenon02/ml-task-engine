@@ -62,7 +62,7 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
         logger.error("task.execute_job not found", job_id=job_id)
         return {"error": f"Job {job_id} not found"}
     
-    if job.status == JobStatus.CANCELLED:
+    if job.status == JobStatus.CANCELED:
         logger.info("task.job cancelled before start", job_id = job_id)
         return {"status": "cancelled", "job_id": job_id}
     
@@ -207,7 +207,7 @@ def _execute_job_with_limits(
             while not stop_monitoring.is_set():
                 try:
                     monitor_job = monitor_db.query(Job).filter(job_snapshot["id"] == job_snapshot["id"]).first()
-                    if monitor_job and monitor_job.status == JobStatus.CANCELLED:
+                    if monitor_job and monitor_job.status == JobStatus.CANCELED:
                         logger.info("task cancelled during execution", job_id = job_snapshot["id"])
                         stop_monitoring.set()
                         os.kill(os.getpid(), signal.SIGTERM)
