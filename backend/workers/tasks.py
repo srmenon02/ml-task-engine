@@ -1,11 +1,19 @@
 from celery import Task
+from celery.exceptions import SoftTimeLimitExceeded
 from datetime import datetime
 import structlog
 import psutil
 import time
 import traceback
+import threading
+import os
+import socket
 from typing import Dict, Any
 
+from pathlib import Path
+import sys
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir))
 from core.training_scheduler import get_training_scheduler
 from workers.celery_app import celery_app
 from models import local_session, Job, JobStatus, Execution, ResourceProfile
@@ -17,9 +25,11 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 
 import threading
-
+from celery import signals
+from core.worker_health import get_health_monitor
 
 logger = structlog.get_logger()
+logger.info("tasks.py reloaded, new version")
 
 class DBTask(Task):
     _db = None
@@ -41,10 +51,21 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
     db = self.db
 
     job = db.query(Job).filter(Job.id == job_id).first()
+    job_snapshot = {
+        "id": job.id,
+        "job_type": job.job_type,
+        "config": job.config,
+        "max_memory_mb": job.max_memory_mb,
+        "max_execution_time_sec": job.max_execution_time_sec
+    }
 
     if not job:
         logger.error("task.execute_job not found", job_id=job_id)
         return {"error": f"Job {job_id} not found"}
+    
+    if job.status == JobStatus.CANCELED:
+        logger.info("task.job cancelled before start", job_id = job_id)
+        return {"status": "cancelled", "job_id": job_id}
     
     job.status = JobStatus.RUNNING
     job.started_at = datetime.now()
@@ -69,7 +90,7 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
     start_time = time.time()
 
     try:
-        result = _execute_job_by_type(job, process, cpu_samples, memory_samples)
+        result = _execute_job_with_limits(job_snapshot, process, cpu_samples, memory_samples, self.request.id, db,)
 
         execution_time = time.time() - start_time
 
@@ -104,11 +125,32 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
             memory_mb_avg = memory_avg / (1024 * 1024),
         )
 
+
         return {
             "status": "success",
             "job_id": job_id,
             "result": result,
             "execution_time": execution_time,
+        }
+    
+    except SoftTimeLimitExceeded:
+        error_msg = f"Job exceeded time limit of {job.max_execution_time_sec} seconds"
+        logger.error("task timeout", job_id=job_id, max_time = job.max_execution_time_sec)
+
+        execution.completed_at = datetime.now()
+        execution.success = 0
+        execution.error_msg = error_msg
+
+        job.status = JobStatus.TIMEOUT
+        job.error_message = error_msg
+        job.completed_at = datetime.now()
+
+        db.commit()
+
+        return {
+            "status": "timeout",
+            "job_id": job_id,
+            "error": error_msg
         }
     except Exception as e:
         error_msg = str(e)
@@ -143,33 +185,101 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
             )
 
             raise self.retry(exc=e, countdown=2 ** job.retry_count)
-        
+                
         return {
             "status": "failed",
             "job_id": job_id,
             "error_msg": error_msg,
         }
 
+def _execute_job_with_limits(
+        job_snapshot: Dict,
+        process: psutil.Process,
+        cpu_samples: list,
+        memory_samples: list,
+        task_id: str,
+        db,
+) -> Dict[str, Any]:
+    stop_monitoring = threading.Event()
+    memory_exceeded = threading.Event()
+    baseline_rss = process.memory_info().rss
+
+    def monitor_resources():
+        monitor_db = local_session()
+        try:
+            while not stop_monitoring.is_set():
+                try:
+                    monitor_job = monitor_db.query(Job).filter(job_snapshot["id"] == job_snapshot["id"]).first()
+                    if monitor_job and monitor_job.status == JobStatus.CANCELED:
+                        logger.info("task cancelled during execution", job_id = job_snapshot["id"])
+                        stop_monitoring.set()
+                        raise MemoryError("Job canclled during Execution")
+
+                    cpu_samples.append(process.cpu_percent(interval=0.1))
+                    mem_info = process.memory_info()
+                    memory_samples.append(mem_info.rss)
+
+                    current_rss = process.memory_info().rss
+                    delta_mb = (current_rss - baseline_rss) / (1024 * 1024)
+                    if job_snapshot["max_memory_mb"] and delta_mb > job_snapshot["max_memory_mb"]:
+                        logger.error(
+                            "task.memory_limit execeeded",
+                            job_id = job_snapshot["id"],
+                            current_mb = delta_mb,
+                            limit_mb = job_snapshot["max_memory_mb"],
+                        )
+                        memory_exceeded.set()
+                        stop_monitoring.set()
+                        raise MemoryError("Job exceeded memory limit")
+
+                    time.sleep(0.5)
+                except Exception as e:
+                    logger.error(f"monitor error: {e}")
+                    break
+        finally:
+            monitor_db.close()
+
+    monitor_thread = threading.Thread(target=monitor_resources, daemon=True)
+    monitor_thread.start()
+
+    try:
+        job_type = job_snapshot["job_type"]
+        job_config = job_snapshot["config"]
+        job_id = job_snapshot["id"]
+        result = _execute_job_by_type(job_type, job_config, job_id, process, cpu_samples, memory_samples)
+        stop_monitoring.set()
+        monitor_thread.join(timeout=2)
+
+        if memory_exceeded.is_set():
+            raise MemoryError(
+                f"Job exceeded memory limit of {job_snapshot["max_memory_mb"]} MB"
+            )
+        return result
+    except Exception as e:
+        stop_monitoring.set()
+        raise
+    
 def _execute_job_by_type(
-    job: Job,
+    job_type,
+    job_config,
+    job_id,
     process: psutil.Process,
     cpu_samples: list,
     memory_samples: list,
 ) -> Dict[str, Any]:
-    if job.job_type == "train_sklearn_model":
-        return _train_sklearn_model(job, process, cpu_samples, memory_samples)
+    if job_type == "train_sklearn_model":
+        return _train_sklearn_model(job_id, job_config, process, cpu_samples, memory_samples)
     else:
-        raise ValueError(f"Unknown job type: {job.job_type}")
+        raise ValueError(f"Unknown job type: {job_type}")
     
 def _train_sklearn_model(
-        job: Job,
+        job_id,
+        config,
         process: psutil.Process,
         cpu_samples: list,
         memory_samples: list,
 ) -> Dict[str, Any]:
-    logger.info("sklearn.trainning started", job_id=job.id, config=job.config)
-
-    config = job.config
+    logger.info("sklearn.trainning started", job_id=job_id, config=config)
     model_type = config.get("model", "RandomForest")
     n_estimators = config.get("n_estimators", 100)
     n_samples = config.get("dataset_rows", 10000)
@@ -197,26 +307,9 @@ def _train_sklearn_model(
         model = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
-    
-    stop_monitoring = threading.Event()
 
-    def monitor_resources():
-        while not stop_monitoring.is_set():
-            try:
-                cpu_samples.append(process.cpu_percent(interval=0.1))
-                mem_info = process.memory_info()
-                memory_samples.append(mem_info.rss)
-                time.sleep(0.5)
-            except:
-                break
-
-    monitor_thread = threading.Thread(target=monitor_resources)
-    monitor_thread.start()
 
     model.fit(X_train, y_train)
-
-    stop_monitoring.set()
-    monitor_thread.join()
 
     training_time = time.time() - start
 
@@ -225,7 +318,7 @@ def _train_sklearn_model(
 
     logger.info(
         "sklearn training done",
-        job_id=job.id,
+        job_id=job_id,
         accuracy=accuracy,
         time=training_time
     )
