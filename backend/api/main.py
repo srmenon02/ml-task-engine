@@ -11,6 +11,7 @@ backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from workers.tasks import execute_job
+from workers.celery_app import celery_app
 from models import get_db, Job, JobStatus
 from models import JobPriority
 from pydantic import BaseModel, Field
@@ -156,14 +157,59 @@ def cancel_job(
 
 @app.get("/workers/health")
 def get_workers_health():
-    monitor = get_health_monitor()
-    workers = monitor.get_all_workers()
+    inspect = celery_app.control.inspect()
 
+    stats = inspect.stats()
+    active = inspect.active()
+    registered = inspect.registered()
+
+    if not stats:
+        return {
+            "total_workers": 0,
+            "workers": [],
+            "message": "No workers found. Ensure workers are running"
+        }
+    
+    workers = []
+    for worker_name, worker_stats in stats.items():
+        workers.append({
+            "worker_id": worker_name,
+            "status": "active",
+            "pool": worker_stats.get("pool", {}).get("implementation", "unkwown"),
+            "max_concurrency": worker_stats.get("pool", {}).get("max-concurrency", 0),
+            "active_jobs": len(active.get(worker_name, [])) if active else 0,
+            "total_tasks": worker_stats.get("total", {}),
+        })
     return {
         "total_workers": len(workers),
         "workers": workers,
     }
 
+@app.get("/workers/active-jobs")
+def get_active_jobs():
+    inspect = celery_app.control.inspect()
+    active = inspect.active()
+
+    if not active:
+        return {
+            "active_jobs": 0,
+            "jobs": []
+        }
+    all_jobs = []
+    for worker_name, jobs in active.items():
+        for job in jobs:
+            all_jobs.append({
+                "worker": worker_name,
+                "task_id": job.get("id"),
+                "task_name": job.get("name"),
+                "args": job.get("args"),
+                "time_start": job.get("time_start"),
+            })
+            
+    return {
+        "active jobs": len(all_jobs),
+        "jobs": all_jobs,
+    }
 @app.get("/workers/{worker_id}/health")
 def get_worker_health(worker_id: str):
     monitor = get_health_monitor()

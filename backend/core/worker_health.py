@@ -33,7 +33,7 @@ class WorkerHealthMonitor:
         if success:
             self.workers[worker_id]["jobs_completed"] += 1
         else:
-            self.workers[worker_id]["jobs_failed"] -= 1
+            self.workers[worker_id]["jobs_failed"] += 1
     
     def get_worker_stats(self, worker_id: str) -> Dict:
         if worker_id not in self.workers:
@@ -56,7 +56,7 @@ class WorkerHealthMonitor:
         return [self.get_worker_stats(wid) for wid in self.workers.keys()]
 
 def check_stale_workers(self, timeout_secs: int = 300) -> List[str]:
-    threshold = datetime.now - timedelta(seconds=timeout_secs)
+    threshold = datetime.now() - timedelta(seconds=timeout_secs)
     stale_workers = []
 
     for worker_id, worker in self.workers.items():

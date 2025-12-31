@@ -7,7 +7,7 @@ import time
 import traceback
 import threading
 import os
-import signal
+import socket
 from typing import Dict, Any
 
 from pathlib import Path
@@ -25,7 +25,8 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 
 import threading
-
+from celery import signals
+from core.worker_health import get_health_monitor
 
 logger = structlog.get_logger()
 logger.info("tasks.py reloaded, new version")
@@ -124,6 +125,7 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
             memory_mb_avg = memory_avg / (1024 * 1024),
         )
 
+
         return {
             "status": "success",
             "job_id": job_id,
@@ -183,7 +185,7 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
             )
 
             raise self.retry(exc=e, countdown=2 ** job.retry_count)
-        
+                
         return {
             "status": "failed",
             "job_id": job_id,
