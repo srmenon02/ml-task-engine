@@ -39,7 +39,7 @@ EOF
 ml_task_engine_guide.md
 setup-guides
 backend/models/saved/
-backend/core/saved_models/
+backend/core/saved_models/*
 backend/core/test_predictor_script.txt
-ml-task-engine.zip
+ml-task-engine .zip
 backend/api/api_tests/*
