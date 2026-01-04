@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -19,6 +19,7 @@ from core.predictor import get_predictor
 from core.accuracy_tracker import calculate_prediction_accuracy
 from core.scheduler import get_scheduler
 from core.worker_health import get_health_monitor
+from core.security import get_validator, get_rate_limiter
 
 logger = structlog.get_logger()
 
@@ -73,8 +74,35 @@ def health_check():
     return {"status": "healthy"} 
 
 @app.post("/jobs", response_model=JobResponse, status_code=201)
-def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
+def create_job(job_data: JobCreate, request: Request, db: Session = Depends(get_db)):
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
+
+    rate_limiter = get_rate_limiter()
+    client_ip = request.client.host
+
+    allowed, info = rate_limiter.is_allowed(user_id = job_data.user_id, ip_address = client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code = 429,
+            detail = {
+                "error": "Rate Limit Exceeded",
+                "limit": info["limit"],
+                "window_seconds": info["window"],
+                "retry_after": info["retry_after"],
+            }
+        )
+    
+    validator = get_validator()
+    is_valid, error_msg = validator.validate_job(job_data.job_type, job_data.config)
+    if not is_valid:
+        logger.warning(
+            "Validator.validate_job - invalid job rejected",
+            user_id = job_data.user_id,
+            job_type = job_data.job_type,
+            reason = error_msg
+        )
+
+        raise HTTPException(status_code = 400, detail = error_msg)
 
     predictor = get_predictor()
     predicted_memory, predicted_cpu = predictor.predict(
@@ -280,6 +308,41 @@ def evaluate_predictor():
 @app.get("/predictor/accuracy")
 def get_prediction_accuracy():
     return calculate_prediction_accuracy()
+
+
+@app.middleware("http")
+async def add_rate_limit_headers(request: Request, call_next):
+    response = await call_next(request)
+
+    if hasattr(request.state, "user_id"):
+        rate_limiter = get_rate_limiter()
+        usage = rate_limiter.get_usage(request.state.user_id)
+
+        if "error" not in usage:
+            response.headers["X-RateLimit-Limit"] = str(usage["requests_limit"])
+            response.headers["X-RateLimit-Remaining"] = str(usage["requests_remaining"])
+            response.headers["X-RateLimit-Reset"] = str(usage["window_seconds"])
+
+    return response
+
+@app.get("/admin/rate-limit/{user_id}")
+def get_rate_limit_usage(user_id: str):
+    rate_limiter = get_rate_limiter()
+    usage = rate_limiter.get_usage(user_id)
+    return usage
+
+@app.post("/admin/rate-limit/{user_id}/reset")
+def reset_rate_limit(user_id: str):
+    rate_limiter = get_rate_limiter()
+    success = rate_limiter.reset(user_id)
+
+    if success:
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "message": "Rate Limit reset"
+        }
+    raise HTTPException(status_code = 500, detail = "Failed to reset rate limit")
 
 if __name__ == "__main__": 
     import uvicorn
