@@ -33,7 +33,7 @@ class JobCreate(BaseModel):
     job_type: str
     config: dict
     user_id: str = "default_user"
-    priority: int = Field(defualt=JobPriority.NORMAL.value, ge=0, le=20)
+    priority: int = Field(default=JobPriority.NORMAL.value, ge=0, le=20)
     max_memory_mb: Optional[float] = None
     max_execution_time_sec: int = Field(default=3600, ge=60, le=86400)
 
