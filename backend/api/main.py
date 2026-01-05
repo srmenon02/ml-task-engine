@@ -20,6 +20,7 @@ from core.accuracy_tracker import calculate_prediction_accuracy
 from core.scheduler import get_scheduler
 from core.worker_health import get_health_monitor
 from core.security import get_validator, get_rate_limiter
+from core.auth import verify_api_key
 
 logger = structlog.get_logger()
 
@@ -74,7 +75,13 @@ def health_check():
     return {"status": "healthy"} 
 
 @app.post("/jobs", response_model=JobResponse, status_code=201)
-def create_job(job_data: JobCreate, request: Request, db: Session = Depends(get_db)):
+def create_job(
+    job_data: JobCreate,
+    request: Request,
+    auth: dict = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+    ):
+    job_data.user_id = auth["user_id"]
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
 
     rate_limiter = get_rate_limiter()
@@ -144,11 +151,18 @@ def create_job(job_data: JobCreate, request: Request, db: Session = Depends(get_
     return job
 
 @app.get("/jobs/{job_id}", response_model=JobResponse)
-def get_job(job_id: int, db: Session = Depends(get_db)):
+def get_job(
+    job_id: int,
+    auth: dict = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+    ):
     job = db.query(Job).filter(Job.id == job_id).first()
 
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    
+    if job.user_id != auth["user_id"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
     
     return job
 
