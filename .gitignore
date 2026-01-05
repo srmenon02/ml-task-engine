@@ -46,4 +46,5 @@ backend/core/saved_models/cpu_model.pkl
 backend/core/test_predictor_script.txt
 ml-task-engine .zip
 backend/api/api_tests/*
+backend/.env
 .env
