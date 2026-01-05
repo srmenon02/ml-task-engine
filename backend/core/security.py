@@ -31,6 +31,13 @@ class SecurityValidator:
         r"\.\./",
         r"<script",
         r"javascript:",
+        r";\s*DROP",
+        r";\s*DELETE",
+        r";\s*UPDATE",
+        r"--", 
+        r"/\*",
+        r"\$\{",
+        r"\$\(",
     ]
 
     def validate_job(cls, job_type: str, config: Dict[str, Any]) -> tuple[bool, str]:
