@@ -48,3 +48,4 @@ ml-task-engine .zip
 backend/api/api_tests/*
 backend/.env
 .env
+production.txt
