@@ -21,6 +21,7 @@ from core.scheduler import get_scheduler
 from core.worker_health import get_health_monitor
 from core.security import get_validator, get_rate_limiter
 from core.auth import verify_api_key
+from core.audit import log_audit_event
 
 logger = structlog.get_logger()
 
@@ -111,6 +112,15 @@ def create_job(
 
         raise HTTPException(status_code = 400, detail = error_msg)
 
+    log_audit_event(
+        event_type = "job_created",
+        user_id = auth["user_id"],
+        details = {
+            "job_type": job_data.job_type,
+            "priority": job_data.priority
+        },
+        severity = "info"
+    )
     predictor = get_predictor()
     predicted_memory, predicted_cpu = predictor.predict(
         job_data.config,
