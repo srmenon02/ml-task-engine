@@ -94,6 +94,25 @@ app.add_middleware(
     allow_methods=["GET", "POTS", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    logger.info(
+        "api request",
+        method = request.method,
+        path = request.url.path,
+        client_ip = request.client.host,
+    )
+
+    response = await call_next(request)
+
+    logger.info(
+        "api response",
+        status_code = response.status_code,
+        path = request.url.path,
+    )
+
+    return response
 @app.get("/health")
 def health_check():
     return {"status": "healthy"} 
