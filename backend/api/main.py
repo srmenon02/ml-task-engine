@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -71,6 +73,27 @@ class JobResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class SecurityHeadersMiddleWare(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+
+        response.headers["X-FRAME-OPTIONS"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+
+        return response
+
+app.add_middleware(SecurityHeadersMiddleWare)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POTS", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 @app.get("/health")
 def health_check():
     return {"status": "healthy"} 
