@@ -39,5 +39,13 @@ EOF
 ml_task_engine_guide.md
 setup-guides
 backend/models/saved/
+backend/core/saved_models/*
+backend/core/saved_models/scaler.pkl
+backend/core/saved_models/memory_model.pkl
+backend/core/saved_models/cpu_model.pkl
 backend/core/test_predictor_script.txt
-ml-task-engine.zip
+ml-task-engine .zip
+backend/api/api_tests/*
+backend/.env
+.env
+production.txt
