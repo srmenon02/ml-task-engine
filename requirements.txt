@@ -34,3 +34,4 @@ mypy==1.7.1
 ruff==0.1.6
 
 redis-rate-limit == 0.1.0
+prometheus-client==0.19.0
