@@ -27,6 +27,9 @@ from core.auth import verify_api_key
 from core.audit import log_audit_event
 import uuid
 from core.logging_config import get_correlation_id, set_correlation_id, RequestLogger
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
+from core.metrics import track_request_metrics, track_job_metrics, jobs_submitted_total, MetricsCollector
 
 logger = structlog.get_logger()
 
@@ -134,6 +137,21 @@ async def logging_middleware(request: Request, call_next):
 
         raise
 
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+
+    duration = time.time() - start_time
+    track_request_metrics(
+        method = request.method,
+        endpoint = request.url.path,
+        status_code = response.status_code,
+        duration = duration
+    )
+
+    return response
+
 class SecurityHeadersMiddleWare(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -206,6 +224,12 @@ def create_job(
         },
         severity = "info"
     )
+
+    jobs_submitted_total.labels(
+        job_type = job_data.job_type,
+        priority = job_data.priority
+    ).inc()
+
     predictor = get_predictor()
     predicted_memory, predicted_cpu = predictor.predict(
         job_data.config,
@@ -452,6 +476,13 @@ def reset_rate_limit(user_id: str):
             "message": "Rate Limit reset"
         }
     raise HTTPException(status_code = 500, detail = "Failed to reset rate limit")
+
+@app.get("/metrics")
+def metrics():
+    return Response(
+        content = generate_latest(),
+        media_type = CONTENT_TYPE_LATEST
+    )
 
 if __name__ == "__main__": 
     import uvicorn
