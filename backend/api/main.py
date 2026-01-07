@@ -6,6 +6,7 @@ from sqlalchemy import func
 from typing import List, Optional
 import structlog
 import sys
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -24,6 +25,8 @@ from core.worker_health import get_health_monitor
 from core.security import get_validator, get_rate_limiter
 from core.auth import verify_api_key
 from core.audit import log_audit_event
+import uuid
+from core.logging_config import get_correlation_id, set_correlation_id, RequestLogger
 
 logger = structlog.get_logger()
 
@@ -73,6 +76,64 @@ class JobResponse(BaseModel):
     class Config:
         from_attributes = True
 
+@app.middleware("http")
+async def log_requests(request, call_next):
+    logger.info(
+        "api request",
+        method = request.method,
+        path = request.url.path,
+        client_ip = request.client.host,
+    )
+
+    response = await call_next(request)
+
+    logger.info(
+        "api response",
+        status_code = response.status_code,
+        path = request.url.path,
+    )
+
+    return response
+
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+    set_correlation_id(correlation_id)
+
+    RequestLogger.log_request(
+        method = request.method,
+        path = request.url.path,
+        client_ip = request.client.host,
+        headers = dict(request.headers),
+    )
+
+    start_time = time.time()
+
+    try:
+        response = await call_next(request)
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        RequestLogger.log_response(
+            method = request.method,
+            path = request.url.path,
+            status_code = response.status_code,
+            duration_ms = duration_ms,
+        )
+
+        response.headers["X-Correlation-ID"] = correlation_id
+
+        return response
+    
+    except Exception as e:
+        RequestLogger.log_error(
+            method = request.method,
+            path = request.url.path,
+            error = e,
+        )
+
+        raise
+
 class SecurityHeadersMiddleWare(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -95,24 +156,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-@app.middleware("http")
-async def log_requests(request, call_next):
-    logger.info(
-        "api request",
-        method = request.method,
-        path = request.url.path,
-        client_ip = request.client.host,
-    )
-
-    response = await call_next(request)
-
-    logger.info(
-        "api response",
-        status_code = response.status_code,
-        path = request.url.path,
-    )
-
-    return response
 @app.get("/health")
 def health_check():
     return {"status": "healthy"} 
