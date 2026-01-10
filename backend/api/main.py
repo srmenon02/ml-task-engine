@@ -7,6 +7,7 @@ from typing import List, Optional
 import structlog
 import sys
 import time
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -28,8 +29,11 @@ from core.audit import log_audit_event
 import uuid
 from core.logging_config import get_correlation_id, set_correlation_id, RequestLogger
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from core.metrics import track_request_metrics, track_job_metrics, jobs_submitted_total, MetricsCollector
+from core.health import HealthCheck, HealthStatus
+from core.statistics import JobStatistics
+from core.error_tracking import get_error_tracker, ErrorSeverity
 
 logger = structlog.get_logger()
 
@@ -482,6 +486,130 @@ def metrics():
     return Response(
         content = generate_latest(),
         media_type = CONTENT_TYPE_LATEST
+    )
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "timestampe": datetime.now().isoformtat() + "Z"
+    }
+
+@app.get("/health/live")
+def live_probe():
+    if HealthCheck.is_alive():
+        return {"status": "alive"}
+    else:
+        raise HTTPException(status_code=503, detail="Service not alive")
+    
+@app.get("/health/ready")
+def readiness_probe():
+    if HealthCheck.is_ready():
+        return {"status": "ready"}
+    else:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    
+@app.get("/health/detailed")
+def detailed_health():
+    health = HealthCheck.get_comprehensive_health()
+
+    if health["status"] == HealthStatus.UNHEALTHY:
+        status_code = 503
+    else:
+        status_code = 200
+
+    return Response(
+        content = json.dumps(health, indent = 2),
+        status_code = status_code,
+        media_type = "application/json"
+    )
+
+@app.get("/stats/overall")
+def get_overall_stats():
+    return JobStatistics.get_overall_stats()
+
+@app.get("/stats/by-type")
+def get_stats_by_type():
+    return JobStatistics.get_stats_by_job_type()
+
+@app.get("/stats/execution-times")
+def get_execution_time_stats():
+    return JobStatistics.get_execution_time_stats()
+
+@app.get("/stats/recent")
+def get_recent_jobs(limit: int = 10):
+    return JobStatistics.get_recent_jobs(limit = limit)
+
+@app.get("stats/timeseries")
+def get_timeseries_stats(hours: int = 24):
+    return JobStatistics.get_timeseries_stats(hours = hours)
+
+@app.get("/errors/summary/")
+def get_error_summary(hours: int = 1):
+    tracker = get_error_tracker()
+    return tracker.get_error_summary(hours = hours)
+
+@app.get("/errors/rate/")
+def get_error_rate(minutes: int = 5):
+    tracker = get_error_tracker()
+    rate = tracker.get_error_rate(minutes = minutes)
+    return {
+        "errors_per_minute": round(rate, 2),
+        "time_window_minutes": minutes,
+    }
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tracker = get_error_tracker()
+
+    tracker.record_error(
+        error_type = "Exception",
+        error_message = str(exc),
+        severity = ErrorSeverity.HIGH,
+        context = {
+            "path": request.url.path,
+            "method": request.method
+        }
+    )
+
+    logger.error(
+        "unhandled exception",
+        error_type = type(exc).__name__,
+        error = str(exc),
+        path = request.url.path,
+    )
+
+    return JSONResponse(
+        status_code = 500,
+        content = {"detail", "Internal Server Error"}
+    )
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    tracker = get_error_tracker()
+    
+    if exc.status_code >= 400:
+        tracker.record_error(
+            error_type="HTTPException",
+            error_message=exc.detail,
+            severity=ErrorSeverity.HIGH if exc.status_code >= 500 else ErrorSeverity.WARNING,
+            context={
+                "path": request.url.path,
+                "method": request.method,
+                "status_code": exc.status_code
+            }
+        )
+        
+        logger.error(
+            "http_exception",
+            status_code=exc.status_code,
+            detail=exc.detail,
+            path=request.url.path,
+            severity="high" if exc.status_code >= 500 else "warning"
+        )
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
     )
 
 if __name__ == "__main__": 
