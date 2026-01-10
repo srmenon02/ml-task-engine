@@ -27,6 +27,7 @@ import numpy as np
 import threading
 from celery import signals
 from core.worker_health import get_health_monitor
+from core.metrics import track_job_metrics
 
 logger = structlog.get_logger()
 logger.info("tasks.py reloaded, new version")
@@ -125,6 +126,14 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
             memory_mb_avg = memory_avg / (1024 * 1024),
         )
 
+        track_job_metrics(
+            job_type = job.job_type,
+            status = "completed",
+            duration = execution_time,
+            memory_mb = execution.actual_memory_mb_max,
+            cpu_percent = execution.actual_cpu_percent_max,
+        )
+
 
         return {
             "status": "success",
@@ -185,6 +194,11 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
             )
 
             raise self.retry(exc=e, countdown=2 ** job.retry_count)
+        
+        track_job_metrics(
+            job_type = job.job_type,
+            status = "failed",
+        )
                 
         return {
             "status": "failed",
