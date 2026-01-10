@@ -50,3 +50,4 @@ backend/api/api_tests/*
 backend/.env
 .env
 production.txt
+.github/
