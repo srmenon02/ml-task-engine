@@ -50,4 +50,5 @@ backend/api/api_tests/*
 backend/.env
 .env
 production.txt
-.github/
+.github/copilot-instructions.md
+backend/tests/load/local_test_command.txt
