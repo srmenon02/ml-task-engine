@@ -20,10 +20,10 @@ class TestResourcePredictor:
                 job_type = "train_sklearn_model",
                 config = {
                     "n_estimators": 100 + i * 10,
-                    "dataset_rows": 10000 = i * 1000,
+                    "dataset_rows": 10000 + i * 1000,
                     "n_features": 20,
                     "max_depth": 10
-                }
+                },
                 memory_mb = 500 + i * 50,
                 cpu_percent = 30 + i * 2,
                 execution_time = 60 + i * 5
