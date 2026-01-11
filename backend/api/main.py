@@ -174,7 +174,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["GET", "POTS", "DELETE"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -492,7 +492,7 @@ def metrics():
 def health_check():
     return {
         "status": "healthy",
-        "timestampe": datetime.now().isoformtat() + "Z"
+        "timestampe": datetime.now().isoformat() + "Z"
     }
 
 @app.get("/health/live")
