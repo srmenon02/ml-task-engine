@@ -18,7 +18,7 @@ from workers.tasks import execute_job
 from workers.celery_app import celery_app
 from models import get_db, Job, JobStatus
 from models import JobPriority
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from core.predictor import get_predictor
 from core.accuracy_tracker import calculate_prediction_accuracy
 from core.scheduler import get_scheduler
@@ -65,6 +65,11 @@ class JobCreate(BaseModel):
         }
 
 class JobResponse(BaseModel):
+    model_config = ConfigDict(
+        use_enum_values = True,
+        from_attributes = True
+    )
+
     id: int
     job_type: str
     status: JobStatus
@@ -79,9 +84,6 @@ class JobResponse(BaseModel):
     cancelled_by: Optional[str]
     cancelled_at: Optional[datetime] = None
     error_message: str = None
-
-    class Config:
-        from_attributes = True
 
 @app.middleware("http")
 async def log_requests(request, call_next):
@@ -591,7 +593,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         tracker.record_error(
             error_type="HTTPException",
             error_message=exc.detail,
-            severity=ErrorSeverity.HIGH if exc.status_code >= 500 else ErrorSeverity.WARNING,
+            severity=ErrorSeverity.HIGH if exc.status_code >= 500 else ErrorSeverity.MEDIUM,
             context={
                 "path": request.url.path,
                 "method": request.method,

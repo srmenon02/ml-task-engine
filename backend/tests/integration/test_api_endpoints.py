@@ -6,7 +6,7 @@ class TestJobAPI:
     def test_create_job_authenticated(self, client, auth_headers, test_db):
         response = client.post(
             "/jobs",
-            josn = {
+            json = {
                 "job_type": "train_sklearn_model",
                 "config": {
                     "model": "RandomForest",
@@ -23,19 +23,19 @@ class TestJobAPI:
         assert data["job_type"] == "train_sklearn_model"
         assert data["status"] == JobStatus.PENDING
 
-        job = test_db.query(Job).filter(Job.id == data[id]).first()
+        job = test_db.query(Job).filter(Job.id == data["id"]).first()
         assert job is not None
 
     def test_create_job_unauthenticated(self, client):
         response = client.post(
             "/jobs",
-            josn = {
+            json = {
                 "job_type": "train_sklearn_model",
                 "config": {"n_estimators": 100}
             }
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     @pytest.mark.security
     def test_create_job_with_malicious_config(self, client, auth_headers):

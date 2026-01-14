@@ -51,19 +51,42 @@ class TestSecurityValidator:
         })
         assert is_valid is False
 
-class TestRateLimiter:
+class TestRateLimiter:    
     @pytest.fixture
     def rate_limiter(self, mock_redis):
-        return RedisRateLimiter(redis_client = mock_redis)
+        return RedisRateLimiter(redis_client=mock_redis)
     
     @pytest.mark.security
     def test_rate_limit_blocks_excessive_requests(self, rate_limiter, mock_redis):
-        mock_redis.execute.return_value = [0, 100, True, True]
-
-        allowed, info = rate_limiter.is_allowed("user123")
-
-        assert allowed is False
-        assert "limit_type" in info.lower()
-
+        pipeline = mock_redis.pipeline.return_value
+        pipeline.execute.return_value = [0, 100, True, True]
         
+        allowed, info = rate_limiter.is_allowed("user123")
+        
+        assert allowed is False
+        assert "limit_type" in info
+        assert info["limit"] == 100
+    
+    @pytest.mark.security
+    def test_rate_limit_allows_within_limit(self, rate_limiter, mock_redis):
+        pipeline = mock_redis.pipeline.return_value
+        pipeline.execute.return_value = [0, 50, True, True]
+        
+        allowed, info = rate_limiter.is_allowed("user123")
+        
+        assert allowed is True
+        assert info["allowed"] is True
+    
+    @pytest.mark.security
+    def test_rate_limit_per_ip(self, rate_limiter, mock_redis):
+        """Rate limit by IP address to prevent distributed DoS."""
+        pipeline = mock_redis.pipeline.return_value
+        pipeline.execute.return_value = [0, 10, True, True]
+        
+        allowed, info = rate_limiter.is_allowed("user123", ip_address="192.168.1.1")
+        
+        assert allowed is True
+        assert mock_redis.pipeline.called
+
+
 

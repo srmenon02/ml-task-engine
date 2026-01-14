@@ -63,7 +63,7 @@ class TestResourcePredictor:
         assert success is False
         assert predictor.is_trained is False
 
-    @patch('core.predicotr.local_session')
+    @patch('core.predictor.local_session')
     def test_train_with_sufficient_data(self, mock_session, predictor, sample_profiles):
         mock_db = Mock()
         mock_db.query().all.return_value = sample_profiles
