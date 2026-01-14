@@ -19,25 +19,26 @@ class SecurityValidator:
     MAX_SLEEP_SECONDS = 60 * 60 * 24
 
     DANGEROUS_PATTERNS = [
-        r"__import__"
-        r"eval\(",
-        r"exec\(",
-        r"compile\(",
-        r"open\(",
-        r"\.system\(",
+        r"__import__",           
+        r"eval\s*\(",            
+        r"exec\s*\(",           
+        r"compile\s*\(",
+        r"open\s*\(",
+        r"\.system\s*\(",
         r"subprocess",
         r"os\.",
         r"sys\.",
-        r"\.\./",
-        r"<script",
+        r"\.\./",                
+        r"<script",             
         r"javascript:",
-        r";\s*DROP",
+        r";\s*DROP",            
         r";\s*DELETE",
         r";\s*UPDATE",
-        r"--", 
-        r"/\*",
-        r"\$\{",
-        r"\$\(",
+        r"\sOR\s+\d+\s*=\s*\d+", 
+        r"--\s*$",             
+        r"/\*",                
+        r"\$\{",                 
+        r"\$\(",                 
     ]
 
     def validate_job(cls, job_type: str, config: Dict[str, Any]) -> tuple[bool, str]:
@@ -103,7 +104,7 @@ class RedisRateLimiter:
     ):
         
         if redis_client:
-            self.redis = redis.client
+            self.redis = redis_client
         else:
             self.redis = redis.from_url(
                 redis_url,
