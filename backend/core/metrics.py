@@ -113,6 +113,17 @@ app_info.info({
     'name': 'ml-task-engine'
 })
 
+bulk_operations_total = Counter(
+    'bulk_operations_total',
+    'Total bulk operations',
+    ['operation_type']
+)
+
+api_version_requests = Counter(
+    'api_version_requests_total',
+    'Requests by API version',
+    ['version']
+)
 def track_request_metrics(
         method: str,
         endpoint: str,
