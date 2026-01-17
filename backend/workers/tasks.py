@@ -266,7 +266,7 @@ def _execute_job_with_limits(
 
         if memory_exceeded.is_set():
             raise MemoryError(
-                f"Job exceeded memory limit of {job_snapshot["max_memory_mb"]} MB"
+                f"Job exceeded memory limit of {job_snapshot['max_memory_mb']} MB"
             )
         return result
     except Exception as e:
