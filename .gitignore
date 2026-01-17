@@ -52,3 +52,4 @@ backend/.env
 production.txt
 .github/copilot-instructions.md
 backend/tests/load/local_test_command.txt
+backend/.coverage
