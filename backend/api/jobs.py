@@ -31,9 +31,12 @@ def list_jobs(
 ):
     params = PaginationParams(page = page, page_size = page_size)
 
+    final_created_after = created_after
+    final_created_before = created_before
+
     if date_range:
         try:
-            created_after, created_before = get_date_range_from_preset(date_range)
+            final_created_after, final_created_before = get_date_range_from_preset(date_range)
         except:
             pass
 
@@ -42,8 +45,8 @@ def list_jobs(
         job_type = job_type,
         priority_min = priority_min,
         priority_max = priority_max,
-        created_after = created_after,
-        created_before = created_before,
+        created_after = final_created_after,
+        created_before = final_created_before,
         search = search
     )
 
