@@ -49,8 +49,8 @@ def bulk_submit_jobs(
                 config = job_config,
                 user_id = user_id,
                 status = JobStatus.PENDING,
-                predcited_cpu_percent = predicted_cpu,
-                predicted_memory = predicted_memory,
+                predicted_cpu_percent = predicted_cpu,
+                predicted_memory_db = predicted_memory,
                 priority = config.get("priority", 5),
                 max_memory_mb = config.get("max_memory_mb", predicted_memory * 2),
                 max_execution_time_sec = config.get("max_execution_time_sec", 3600)
