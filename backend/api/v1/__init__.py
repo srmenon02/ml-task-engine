@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from .jobs import router as jobs_router
+from ..jobs import router as jobs_router
 from .bulk import router as bulk_router
 
 v1_router = APIRouter(prefix = "/v1")

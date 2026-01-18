@@ -98,6 +98,7 @@ def cancel_bulk_jobs(
     result = bulk_cancel_jobs(
         job_ids = request.job_ids,
         user_id = auth["user_id"],
+        cancelled_by = auth["user_id"],
         db = db
     )
 
