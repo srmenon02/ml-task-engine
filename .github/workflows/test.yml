@@ -47,6 +47,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      
+      - name: Write .env file
+        run: |
+          cat <<EOF > backend/.env
+          DB_URL=${{ secrets.DB_URL }}
+          API_KEYS=${{ secrets.API_KEYS }}
+          DEFAULT_USER_TIER=${{ secrets.DEFAULT_USER_TIER }}
+          MAX_BULK_JOBS=${{ secrets.MAX_BULK_JOBS }}
+          MAX_PAGE_SIZE=${{ secrets.MAX_PAGE_SIZE}}
+          RATE_LIMIT_ENABLED=${{ secrets.RATE_LIMIT_ENABLED }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          EOF
 
       - name: Run Unit Tests
         run: |
