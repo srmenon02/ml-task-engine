@@ -23,6 +23,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     has_next: bool
     has_prev: bool
 
+    @classmethod
     def create(
         cls,
         items: List[T],
@@ -43,5 +44,5 @@ class PaginatedResponse(BaseModel, Generic[T]):
     
 def paginate_query(query, params: PaginationParams):
     total = query.count()
-    items = query.offset(params.offset).limit(params.limit).all()
+    items = query.offset(params.offset()).limit(params.limit()).all()
     return items, total
