@@ -22,6 +22,7 @@ from core.audit import AuditLog
 from sqlalchemy.pool import StaticPool
 from unittest.mock import patch, PropertyMock
 from workers.tasks import DBTask
+from tests.factories.job_factory import JobFactory
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
@@ -48,6 +49,29 @@ def test_db():
         db.close()
         base.metadata.drop_all(bind = engine)
 
+@pytest.fixture(scope="function")
+def mock_local_session(test_db):
+    """Mock local_session to return test_db everywhere."""
+    def get_test_db():
+        return test_db
+    
+    with patch('models.local_session', side_effect=get_test_db), \
+         patch('models.database.local_session', side_effect=get_test_db), \
+         patch('core.predictor.local_session', side_effect=get_test_db), \
+         patch('core.scheduler.local_session', side_effect=get_test_db), \
+         patch('core.accuracy_tracker.local_session', side_effect=get_test_db), \
+         patch('core.audit.local_session', side_effect=get_test_db), \
+         patch('core.training_scheduler.local_session', side_effect=get_test_db), \
+         patch('core.statistics.local_session', side_effect=get_test_db), \
+         patch('core.health.local_session', side_effect=get_test_db), \
+         patch('workers.tasks.local_session', side_effect=get_test_db):
+        yield
+@pytest.fixture(scope="function")
+def job_factory(test_db):
+    JobFactory._meta.sqlalchemy_session = test_db
+    yield JobFactory
+    JobFactory._meta.sqlalchemy_session = None
+
 @pytest.fixture(scope = "function")
 def override_get_db(test_db):
     def _override():
@@ -55,7 +79,7 @@ def override_get_db(test_db):
     return _override
 
 @pytest.fixture(scope = "function")
-def client(override_get_db):
+def client(override_get_db, mock_local_session):
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
         yield test_client
