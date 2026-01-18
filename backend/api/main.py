@@ -31,6 +31,9 @@ import uuid
 from core.logging_config import get_correlation_id, set_correlation_id, RequestLogger
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import JSONResponse, Response
+import secrets
+from fastapi import Request
+from fastapi.responses import HTMLResponse
 from core.metrics import track_request_metrics, track_job_metrics, jobs_submitted_total, MetricsCollector
 from core.health import HealthCheck, HealthStatus
 from core.statistics import JobStatistics
@@ -165,6 +168,28 @@ class VersionDeprecationMiddleware(BaseHTTPMiddleware):
 
         return response
 app.add_middleware(VersionDeprecationMiddleware)
+
+class CSPMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        if request.url.path == "/docs":
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "style-src 'self' https://cdn.jsdelivr.net; "
+                "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval'; "
+                "img-src 'self' data: https://fastapi.tiangolo.com;"
+            )
+        else:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "style-src 'self'; "
+                "script-src 'self'; "
+                "img-src 'self'; "
+            )
+
+        return response
+app.add_middleware(CSPMiddleware)  
 
 @app.get("/")
 def root():
@@ -756,14 +781,22 @@ All paginated responses follow this structure:
     return app.openapi_schema
 
 @app.get("/docs", include_in_schema=False)
-async def custom_swagger_ut_html():
-    return get_swagger_ui_html(
-        openapi_url = app.openapi_url,
+async def custom_swagger_ui_html():
+    response = get_swagger_ui_html(
+        openapi_url=app.openapi_url,
         title=f"{app.title} - API Documentation",
         swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
         swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
-        swagger_favicon_url="/static/favicon.ico"
+        swagger_favicon_url="/static/favicon.ico",
     )
+
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+        "style-src 'self' https://cdn.jsdelivr.net;"
+    )
+
+    return response
 
 app.openapi = custom_openapi
 
