@@ -19,7 +19,7 @@ def apply_job_filters(query: Query, filters: JobFilters, user_id: str) -> Query:
 
     if filters.status:
         status_values = [s.value if isinstance(s, JobStatus) else s for s in filters.status]
-        query = query.filter(Job.status_in_(status_values))
+        query = query.filter(Job.status.in_(status_values))
 
     if filters.job_type:
         query = query.filter(Job.job_type == filters.job_type)
@@ -33,7 +33,7 @@ def apply_job_filters(query: Query, filters: JobFilters, user_id: str) -> Query:
     if filters.created_afer:
         query = query.filter(Job.created_at >= filters.created_afer)
 
-    if filters.cretaed_before:
+    if filters.created_before:
         query = query.filter(Job.created_at <= filters.created_before)
 
     if filters.search:
@@ -46,20 +46,20 @@ def apply_job_filters(query: Query, filters: JobFilters, user_id: str) -> Query:
 
     return query
 
-class DataRangePreset(str):
+class DateRangePreset(str):
     LAST_HOUR = "last_hour"
     LAST_24H = "last_24h"
     LAST_7D = "last_7d"
     LAST_30D = "last_30d"
 
-def get_data_range_from_preset(preset: DataRangePreset) -> tuple[datetime, datetime]:
+def get_date_range_from_preset(preset: DateRangePreset) -> tuple[datetime, datetime]:
     now = datetime.now()
 
     ranges = {
-        DataRangePreset.LAST_HOUR: timedelta(hours = 1),
-        DataRangePreset.LAST_24H: timedelta(days = 1),
-        DataRangePreset.LAST_7D: timedelta(days = 7),
-        DataRangePreset.LAST_30D: timedelta(days = 30),
+        DateRangePreset.LAST_HOUR: timedelta(hours = 1),
+        DateRangePreset.LAST_24H: timedelta(days = 1),
+        DateRangePreset.LAST_7D: timedelta(days = 7),
+        DateRangePreset.LAST_30D: timedelta(days = 30),
     }
 
     delta = ranges.get(preset, timedelta(days = 1))
