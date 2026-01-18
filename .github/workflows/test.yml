@@ -51,7 +51,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           cd backend
-          python tests/unit -v --cov=backend --cov-report = xml
+          python tests/unit -v
 
       - name: Run Intergration Tests
         run: |
