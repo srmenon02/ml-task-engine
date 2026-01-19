@@ -44,6 +44,13 @@ def hash_api_key(api_key: str) -> str:
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> Dict:
     api_key = credentials.credentials
 
+    if credentials is None:
+        logger.warning("Auth.Missing API Key")
+        raise HTTPException(
+            status_code = 401,
+            detail = "Unauthenticated"
+        )
+
     if api_key not in VALID_API_KEYS:
         logger.warning("Auth.Invalid API Key Attempt", key_prefix=api_key[:8])
         raise HTTPException(
