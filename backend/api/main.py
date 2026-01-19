@@ -67,7 +67,7 @@ async def log_requests(request, call_next):
         "api request",
         method = request.method,
         path = request.url.path,
-        client_ip = request.client.host,
+        client_ip = request.client.host if request.client else "unknown",
     )
 
     response = await call_next(request)
@@ -88,7 +88,7 @@ async def logging_middleware(request: Request, call_next):
     RequestLogger.log_request(
         method = request.method,
         path = request.url.path,
-        client_ip = request.client.host,
+        client_ip = request.client.host if request.client else "unknown",
         headers = dict(request.headers),
     )
 
@@ -259,7 +259,7 @@ def create_job(
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
 
     rate_limiter = get_rate_limiter()
-    client_ip = request.client.host
+    client_ip = request.client.host if request.client else "unknown"
 
     allowed, info = rate_limiter.is_allowed(user_id = job_data.user_id, ip_address = client_ip)
     if not allowed:
