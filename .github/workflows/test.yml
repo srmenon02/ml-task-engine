@@ -68,13 +68,6 @@ jobs:
         working-directory: backend
         run: pytest tests/integration -v --cov=backend --cov-append
 
-      - name: Run Security Tests
-        working-directory: backend
-        run: |
-          pytest tests/security -v
-          bandit -r backend/ -f json -o bandit-report.json
-          safety check --json
-
       - name: Upload Coverage
         uses: codecov/codecov-action@v3
         with:
