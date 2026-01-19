@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 import redis
 import sys
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock
 
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
@@ -17,15 +17,11 @@ from freezegun import freeze_time
 import core.predictor
 import core.scheduler
 import core.worker_health
-from models import Job, Execution, ResourceProfile, JobStatus, JobPriority
-from core.audit import AuditLog
 from sqlalchemy.pool import StaticPool
 from unittest.mock import patch, PropertyMock
 from workers.tasks import DBTask
 from tests.factories.job_factory import JobFactory
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-ENV_PATH = BASE_DIR / ".env"
 
 @pytest.fixture(scope = "function")
 def test_db():
