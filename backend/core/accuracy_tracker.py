@@ -13,7 +13,7 @@ def calculate_prediction_accuracy() -> Dict:
         print(f"Column Names: {Job.__table__.columns.keys()}")
         jobs = db.query(Job).filter(
             Job.status == JobStatus.COMPLETED,
-            Job.predicted_memory_db.isnot(None)
+            Job.predicted_memory_db.isnot(None) 
         ).all()
 
         if len(jobs) == 0:
