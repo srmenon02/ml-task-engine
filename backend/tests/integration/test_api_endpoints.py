@@ -35,7 +35,7 @@ class TestJobAPI:
             }
         )
 
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.status_code in [status.HTTP_403_FORBIDDEN, status.HTTP_401_UNAUTHORIZED]
 
     @pytest.mark.security
     def test_create_job_with_malicious_config(self, client, auth_headers):

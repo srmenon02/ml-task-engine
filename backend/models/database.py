@@ -8,12 +8,13 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
 
-if not ENV_PATH.exists():
-    raise RuntimeError(f".env file not found at {ENV_PATH}")
+if ENV_PATH.exists():
+    load_dotenv(ENV_PATH)
+else:
+    print(".env not found, using OS environment variables")
 
-load_dotenv(ENV_PATH)
+db_url = os.environ.get("DB_URL")
 
-db_url = os.getenv("DB_URL")
 if not db_url:
     raise ValueError("DATABASE URL env variable not set")
 

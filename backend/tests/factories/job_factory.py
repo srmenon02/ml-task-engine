@@ -1,14 +1,17 @@
 import factory
+from factory.alchemy import SQLAlchemyModelFactory
 from factory import fuzzy
 from datetime import datetime, timedelta
 import random
 
 from models import Job, JobStatus, JobPriority
 
-class JobFactory(factory.Factory):
+class JobFactory(SQLAlchemyModelFactory):
     class Meta:
         model = Job
-
+        sqlalchemy_session = None
+        sqlalchemy_session_persistence = "commit"
+    status = factory.LazyAttribute(lambda obj: JobStatus.PENDING)
     job_type = fuzzy.FuzzyChoice(["train_sklearn_model"])
     user_id = factory.Sequence(lambda n: f"user_{n}")
 
@@ -20,10 +23,10 @@ class JobFactory(factory.Factory):
     })
 
     priority = fuzzy.FuzzyChoice([p.value for p in JobPriority])
-    status = fuzzy.FuzzyChoice([s for s in JobStatus])
+    #status = fuzzy.FuzzyChoice([s for s in JobStatus])
 
     predicted_cpu_percent = fuzzy.FuzzyFloat(10.0, 80.0)
     predicted_memory_db = fuzzy.FuzzyFloat(100.0, 2000.0)
 
-    created_at = factory.LazyFunction(datetime.now())
+    created_at = factory.LazyAttribute(lambda _: datetime.now())
     

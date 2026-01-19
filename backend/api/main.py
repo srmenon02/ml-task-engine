@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -17,8 +19,7 @@ sys.path.insert(0, str(backend_dir))
 from workers.tasks import execute_job
 from workers.celery_app import celery_app
 from models import get_db, Job, JobStatus
-from models import JobPriority
-from pydantic import BaseModel, Field, ConfigDict
+from api.models import JobCreate, JobResponse
 from core.predictor import get_predictor
 from core.accuracy_tracker import calculate_prediction_accuracy
 from core.scheduler import get_scheduler
@@ -30,10 +31,16 @@ import uuid
 from core.logging_config import get_correlation_id, set_correlation_id, RequestLogger
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import JSONResponse, Response
+import secrets
+from fastapi import Request
+from fastapi.responses import HTMLResponse
 from core.metrics import track_request_metrics, track_job_metrics, jobs_submitted_total, MetricsCollector
 from core.health import HealthCheck, HealthStatus
 from core.statistics import JobStatistics
 from core.error_tracking import get_error_tracker, ErrorSeverity
+
+from api.v1 import v1_router
+from api.jobs import router as legacy_jobs_router
 
 logger = structlog.get_logger()
 
@@ -41,49 +48,18 @@ app = FastAPI(
     title="Machine-Learning Task Engine API",
     description="Distributed Task Engine with ML-based Resource Prediction",
     version="0.2.0",
+    docs_url = "/docs",
+    redoc_url = "/redoc",
+    openapi_url = "/openapi.json"
 )
 
-class JobCreate(BaseModel):
-    job_type: str
-    config: dict
-    user_id: str = "default_user"
-    priority: int = Field(default=JobPriority.NORMAL.value, ge=0, le=20)
-    max_memory_mb: Optional[float] = None
-    max_execution_time_sec: int = Field(default=3600, ge=60, le=86400)
+app.include_router(v1_router, prefix = "/api")
 
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "job_type": "train_sklearn_model",
-                "config": {
-                    "model": "RandomForest",
-                    "n_estimators": 100,
-                    "dataset_rows": 10000
-                }
-            }
-        }
-
-class JobResponse(BaseModel):
-    model_config = ConfigDict(
-        use_enum_values = True,
-        from_attributes = True
-    )
-
-    id: int
-    job_type: str
-    status: JobStatus
-    config: dict
-    created_at: datetime
-    results: Optional[dict] = None
-    predicted_memory_db: Optional[float] = None
-    predicted_cpu_percent: Optional[float] = None
-    priority: int
-    max_memory_mb: Optional[float] = None
-    max_execution_time_sec: int
-    cancelled_by: Optional[str]
-    cancelled_at: Optional[datetime] = None
-    error_message: str = None
+app.include_router(
+    legacy_jobs_router,
+    tags = ["Legacy (Depracated)"],
+    deprecated = True
+)
 
 @app.middleware("http")
 async def log_requests(request, call_next):
@@ -91,7 +67,7 @@ async def log_requests(request, call_next):
         "api request",
         method = request.method,
         path = request.url.path,
-        client_ip = request.client.host,
+        client_ip = request.client.host if request.client else "unknown",
     )
 
     response = await call_next(request)
@@ -112,7 +88,7 @@ async def logging_middleware(request: Request, call_next):
     RequestLogger.log_request(
         method = request.method,
         path = request.url.path,
-        client_ip = request.client.host,
+        client_ip = request.client.host if request.client else "unknown",
         headers = dict(request.headers),
     )
 
@@ -180,6 +156,53 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+class VersionDeprecationMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        if not request.url.path.startswith("/api/v"):
+            response.headers["X-API-Warn"] = "This endpoint is deprecated. Use /api/v1/* instead"
+            response.headers["Sunset"] = "2026-12-31"
+
+        response.headers["X-API-Version"] = "2.0.0"
+
+        return response
+app.add_middleware(VersionDeprecationMiddleware)
+
+class CSPMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        if request.url.path == "/docs":
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "style-src 'self' https://cdn.jsdelivr.net; "
+                "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval'; "
+                "img-src 'self' data: https://fastapi.tiangolo.com;"
+            )
+        else:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "style-src 'self'; "
+                "script-src 'self'; "
+                "img-src 'self'; "
+            )
+
+        return response
+app.add_middleware(CSPMiddleware)  
+
+@app.get("/")
+def root():
+    return {
+        "name": "ML Task Engine API",
+        "version": "2.0.0",
+        "api_versions": {
+            "v1": "/api/v1",
+            "legacy": "/" "deprecated"
+        },
+        "documentation": "/docs"
+    }
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"} 
@@ -191,11 +214,52 @@ def create_job(
     auth: dict = Depends(verify_api_key),
     db: Session = Depends(get_db)
     ):
+    """
+    Create a new ML training job.
+    
+    The job will be queued for execution based on priority. The system predicts
+    resource requirements and enforces limits during execution.
+    
+    ## Request Body
+    
+    - **job_type**: Type of job (currently supports: `train_sklearn_model`)
+    - **config**: Job-specific configuration (see examples below)
+    - **priority**: Execution priority 0-20 (default: 5, higher = more urgent)
+    - **max_memory_mb**: Memory limit in MB (default: 2x predicted)
+    - **max_execution_time_sec**: Timeout in seconds (default: 3600)
+    
+    ## Example: Random Forest Training
+    
+    ```json
+    {
+      "job_type": "train_sklearn_model",
+      "config": {
+        "model": "RandomForest",
+        "n_estimators": 100,
+        "dataset_rows": 10000,
+        "n_features": 20,
+        "max_depth": 10
+      },
+      "priority": 10
+    }
+    ```
+    
+    ## Response
+    
+    Returns job details including:
+    - Predicted CPU/memory usage
+    - Job ID for tracking
+    - Current status (PENDING)
+    
+    ## Rate Limiting
+    
+    This endpoint counts against your per-user rate limit (100/min).
+    """
     job_data.user_id = auth["user_id"]
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
 
     rate_limiter = get_rate_limiter()
-    client_ip = request.client.host
+    client_ip = request.client.host if request.client else "unknown"
 
     allowed, info = rate_limiter.is_allowed(user_id = job_data.user_id, ip_address = client_ip)
     if not allowed:
@@ -613,6 +677,128 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         status_code=exc.status_code,
         content={"detail": exc.detail}
     )
+
+def custom_openapi():
+    """Generate enhanced OpenAPI schema."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="ML Task Engine API",
+        version="2.0.0",
+        description="""
+# ML Task Engine
+
+A distributed task execution engine with ML-based resource prediction.
+
+## Features
+
+- **Smart Resource Prediction**: ML models predict CPU and memory usage before execution
+- **Priority Queue**: Jobs execute based on priority (0-20 scale)
+- **Rate Limiting**: Per-user and per-IP rate limits prevent abuse
+- **Real-time Monitoring**: Track job execution with detailed metrics
+- **Bulk Operations**: Submit or cancel multiple jobs efficiently
+
+## Authentication
+
+All endpoints require an API key passed in the `Authorization` header:
+
+```
+Authorization: Bearer YOUR_API_KEY
+```
+
+Get your API key from your account settings or contact an administrator.
+
+## Rate Limits
+
+- **Standard users**: 100 requests/minute
+- **IP-based limit**: 300 requests/minute
+- **Global limit**: 1000 requests/minute
+
+Exceeded limits return HTTP 429 with `Retry-After` header.
+
+## Pagination
+
+List endpoints support pagination via query parameters:
+
+- `page`: Page number (default: 1)
+- `page_size`: Items per page (default: 50, max: 100)
+
+## Response Format
+
+All paginated responses follow this structure:
+
+```json
+{
+  "items": [...],
+  "total": 150,
+  "page": 1,
+  "page_size": 50,
+  "total_pages": 3,
+  "has_next": true,
+  "has_prev": false
+}
+```
+""",
+        routes=app.routes,
+        tags=[
+            {
+                "name": "Jobs",
+                "description": "Create, retrieve, and manage ML training jobs"
+            },
+            {
+                "name": "Bulk Operations",
+                "description": "Submit or cancel multiple jobs in a single request"
+            },
+            {
+                "name": "System",
+                "description": "System health and statistics"
+            },
+            {
+                "name": "Admin",
+                "description": "Administrative operations (requires admin role)"
+            }
+        ]
+)
+    
+    openapi_schema["components"]["SecuritySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "API Key",
+            "description": "Enter your API key"
+        }
+    }
+
+    openapi_schema["security"] = [{"BearerAuth": []}]
+
+    openapi_schema["servers"] = [
+        {"url": "http://localhost:8000", "description": "Local development"},
+        {"url": "https://api.mltaskengine.com", "description": "Production"}
+    ]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    response = get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} - API Documentation",
+        swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
+        swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
+        swagger_favicon_url="/static/favicon.ico",
+    )
+
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+        "style-src 'self' https://cdn.jsdelivr.net;"
+    )
+
+    return response
+
+app.openapi = custom_openapi
 
 if __name__ == "__main__": 
     import uvicorn

@@ -13,10 +13,10 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
 
-if not ENV_PATH.exists():
-    raise RuntimeError(f".env file not found at {ENV_PATH}")
-
-load_dotenv(ENV_PATH)
+if ENV_PATH.exists():
+    load_dotenv(ENV_PATH)
+else:
+    print(".env not found, using OS environment variables")
 
 logger = structlog.get_logger()
 
@@ -43,6 +43,13 @@ def hash_api_key(api_key: str) -> str:
 
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> Dict:
     api_key = credentials.credentials
+
+    if credentials is None:
+        logger.warning("Auth.Missing API Key")
+        raise HTTPException(
+            status_code = 401,
+            detail = "Unauthenticated"
+        )
 
     if api_key not in VALID_API_KEYS:
         logger.warning("Auth.Invalid API Key Attempt", key_prefix=api_key[:8])
