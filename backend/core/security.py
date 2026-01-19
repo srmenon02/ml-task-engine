@@ -133,11 +133,12 @@ class RedisRateLimiter:
 
         checks = [
             ("user", user_id, self.limits["user"]),
-            ("global", "global", self.limits["global"]),
         ]
 
         if ip_address:
             checks.append(("ip", ip_address, self.limits["ip"]))
+
+        checks.append(("global", "global", self.limits["global"]))
 
         for limit_type, identifier, config in checks:
             allowed, remaining = self._check_limit(
