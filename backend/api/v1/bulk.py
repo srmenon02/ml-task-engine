@@ -14,7 +14,6 @@ class BulkJobSubmitRequest(BaseModel):
     jobs: List[Dict[str, Any]] = Field(
         description = "List of job configurations",
         min_items = 1,
-        max_items = 100
     )
 
     class Config:
