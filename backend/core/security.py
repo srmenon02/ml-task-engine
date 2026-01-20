@@ -38,8 +38,40 @@ class SecurityValidator:
         r"--\s*$",             
         r"/\*",                
         r"\$\{",                 
-        r"\$\(",                 
+        r"\$\(",
+        r"['\"]\s*or\s*['\"]?\w+['\"]?\s*=\s*['\"]?\w+['\"]?", 
+        r"\.\.[\\/]",
+        r"windows[\\/]+system32",
+        r"system32[\\/]+config",
+        r"^/etc/passwd",
+        r"^/etc/shadow",
+        r"^/proc/",
+        r"^/root/",
+        r"/etc/",
+        r"<script",
+        r"<\s*img",
+        r"<\s*svg",
+        r"<\s*iframe",
+        r"<\s*object",
+        r"<\s*embed",
+        r"onerror\s*=",
+        r"onload\s*=",
+        r"onclick\s*=",
+        r"onmouseover\s*=",
+        r"alert\s*\(",
+        r"prompt\s*\(",
+        r"confirm\s*\(",
+        r"string\.fromcharcode",
+        r"document\.",
+        r"window\.",              
     ]
+
+    EXTERNAL_URL_PATTERN = re.compile(
+        r"(https?:\/\/[^\s]+)",
+        re.IGNORECASE
+    )   
+
+    ALLOWED_DOMAINS = ["localhost", "127.0.0.1", "mycompany.internal"]
 
     def validate_job(cls, job_type: str, config: Dict[str, Any]) -> tuple[bool, str]:
         if job_type not in cls.ALLOWED_JOB_TYPES:
@@ -59,6 +91,11 @@ class SecurityValidator:
 
                         return False, f"Dangerous Pattern detected in config: {pattern}"
                     
+                if cls.EXTERNAL_URL_PATTERN.search(value):
+                    domain = re.findall(r"https?://([^/]+)", value)[0]
+                    if domain not in cls.ALLOWED_DOMAINS:
+                        return False, f"External URLs are not allowed in config: {value}"
+
         if job_type == "train_sklearn_model":
             return cls._validate_sklearn_job(config)
         elif job_type == "sleep":
@@ -246,4 +283,7 @@ def get_rate_limiter() -> RedisRateLimiter:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         _rate_limiter = RedisRateLimiter(redis_url = redis_url)
     return _rate_limiter
+
+def get_rate_limiter_dep() -> RedisRateLimiter:
+    return get_rate_limiter()
 

@@ -9,6 +9,7 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 from dotenv import load_dotenv
+from dataclasses import dataclass
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BASE_DIR / ".env"
@@ -61,3 +62,18 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     user_info = VALID_API_KEYS[api_key]
     logger.info("Authorized API Key", user_id = user_info["user_id"])
     return user_info
+
+@dataclass
+class CurrentUser:
+    user_id: str
+    is_admin: bool = False
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> CurrentUser:
+    user_info = verify_api_key(credentials)
+
+    is_admin = user_info["user_id"].startswith("admin")
+
+    return CurrentUser(
+        user_id = user_info["user_id"],
+        is_admin = is_admin
+    )
