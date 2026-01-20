@@ -43,7 +43,7 @@ def hash_api_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode()).hexdigest()
 
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> Dict:
-    api_key = credentials.credentials
+    api_key = credentials.credentials if credentials else None
 
     if credentials is None:
         logger.warning("Auth.Missing API Key")
