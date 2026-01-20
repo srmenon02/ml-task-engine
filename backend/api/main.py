@@ -24,8 +24,8 @@ from core.predictor import get_predictor
 from core.accuracy_tracker import calculate_prediction_accuracy
 from core.scheduler import get_scheduler
 from core.worker_health import get_health_monitor
-from core.security import get_validator, get_rate_limiter
-from core.auth import verify_api_key
+from core.security import get_validator, get_rate_limiter_dep
+from core.auth import verify_api_key, get_current_user
 from core.audit import log_audit_event
 import uuid
 from core.logging_config import get_correlation_id, set_correlation_id, RequestLogger
@@ -212,53 +212,12 @@ def create_job(
     job_data: JobCreate,
     request: Request,
     auth: dict = Depends(verify_api_key),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    rate_limiter = Depends(get_rate_limiter_dep)
     ):
-    """
-    Create a new ML training job.
-    
-    The job will be queued for execution based on priority. The system predicts
-    resource requirements and enforces limits during execution.
-    
-    ## Request Body
-    
-    - **job_type**: Type of job (currently supports: `train_sklearn_model`)
-    - **config**: Job-specific configuration (see examples below)
-    - **priority**: Execution priority 0-20 (default: 5, higher = more urgent)
-    - **max_memory_mb**: Memory limit in MB (default: 2x predicted)
-    - **max_execution_time_sec**: Timeout in seconds (default: 3600)
-    
-    ## Example: Random Forest Training
-    
-    ```json
-    {
-      "job_type": "train_sklearn_model",
-      "config": {
-        "model": "RandomForest",
-        "n_estimators": 100,
-        "dataset_rows": 10000,
-        "n_features": 20,
-        "max_depth": 10
-      },
-      "priority": 10
-    }
-    ```
-    
-    ## Response
-    
-    Returns job details including:
-    - Predicted CPU/memory usage
-    - Job ID for tracking
-    - Current status (PENDING)
-    
-    ## Rate Limiting
-    
-    This endpoint counts against your per-user rate limit (100/min).
-    """
     job_data.user_id = auth["user_id"]
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
 
-    rate_limiter = get_rate_limiter()
     client_ip = request.client.host if request.client else "unknown"
 
     allowed, info = rate_limiter.is_allowed(user_id = job_data.user_id, ip_address = client_ip)
@@ -376,8 +335,17 @@ def list_job(
 def cancel_job(
     job_id: int,
     cancelled_by: str = "api_user",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
+    job = db.get(Job, job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    
+    if job.user_id != current_user.user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
     scheduler = get_scheduler()
     success = scheduler.cancel_job(job_id, cancelled_by=cancelled_by)
 
