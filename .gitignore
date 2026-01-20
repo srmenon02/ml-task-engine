@@ -54,3 +54,4 @@ production.txt
 backend/tests/load/local_test_command.txt
 backend/.coverage
 .coverage
+gitingest.txt
