@@ -5,9 +5,24 @@ import redis
 import structlog
 import hashlib
 from datetime import datetime
-
+import urllib.parse
 logger = structlog.get_logger()
 
+def _fully_decode(value: str, max_rounds: int = 2) -> str:
+    prev = value
+    for _ in range(max_rounds):
+        decoded = urllib.parse.unquote(prev)
+        if decoded == prev:
+            break
+        prev = decoded
+    return prev
+
+def _decode_unicode_escapes(value: str) -> str:
+    try:
+        return bytes(value, "utf-8").decode("unicode_escape")
+    except Exception:
+        return value
+    
 class SecurityValidator:
     ALLOWED_JOB_TYPES = {
         "train_sklearn_model",
@@ -63,7 +78,31 @@ class SecurityValidator:
         r"confirm\s*\(",
         r"string\.fromcharcode",
         r"document\.",
-        r"window\.",              
+        r"window\.",
+        r"\{\{.*?\}\}",
+        r"#\{.*?\}",
+        r"<%=?\s*.*?\s*%>",
+        r"__\w+__",
+        r"\bconfig\.\w+\s*\(",
+        r"\brequest\.\w+\s*\(",
+        r";\s*\w+",        
+        r"&\s*\w+",       
+        r"\|\s*\w+",    
+        r"\|\|\s*\w+",   
+        r"&&\s*\w+",     
+        r"\b(ls|whoami|id|pwd|cat|uname|ps|env)\b",
+        r"\sAND\s+['\"]\w+['\"]\s*=\s*['\"]\w+['\"]",
+        r"\sAND\s+\d+\s*=\s*\d+",
+        r"\sOR\s+['\"]\w+['\"]\s*=\s*['\"]\w+['\"]",
+        r"\beval\b",
+        r"\bexec\b",
+        r"\bcompile\b",
+        r"(?:^|['\"\s])AND\s+['\"]\w+['\"]\s*=\s*['\"]\w+['\"]",
+        r"AND\s+['\"]\w+['\"]\s*=\s*['\"]\w+['\"]",
+        r"'\s*AND\s+'[^']*'\s*=\s*'[^']*'",
+        r"['\"]\s*AND\s+['\"]\w+['\"]\s*=\s*['\"]\w+['\"]",
+        r"\b(AND|OR)\b\s+['\"].+?['\"]\s*=\s*['\"].+?['\"]",
+        "' AND 'x'='x"
     ]
 
     EXTERNAL_URL_PATTERN = re.compile(
@@ -81,18 +120,31 @@ class SecurityValidator:
         
         for key,value in config.items():
             if isinstance(value, str):
+                decoded_value = _decode_unicode_escapes(_fully_decode(value))
+                normalized = decoded_value.strip()
                 for pattern in cls.DANGEROUS_PATTERNS:
-                    if re.search(pattern, value, re.IGNORECASE):
+                    if re.search(pattern, normalized, re.IGNORECASE):
                         logger.warning(
                             "SecurityValidator dangerous pattern detected",
                             key=key,
                             pattern=pattern,
+                            value=normalized,
                         )
 
                         return False, f"Dangerous Pattern detected in config: {pattern}"
                     
-                if cls.EXTERNAL_URL_PATTERN.search(value):
-                    domain = re.findall(r"https?://([^/]+)", value)[0]
+                    if re.search(pattern, decoded_value, re.IGNORECASE):
+                        logger.warning(
+                            "SecurityValidator dangerous pattern detected",
+                            key=key,
+                            pattern=pattern,
+                            value=decoded_value,
+                        )
+
+                        return False, f"Dangerous Pattern detected in config: {pattern}"
+                    
+                if cls.EXTERNAL_URL_PATTERN.search(decoded_value):
+                    domain = re.findall(r"https?://([^/]+)", decoded_value)[0]
                     if domain not in cls.ALLOWED_DOMAINS:
                         return False, f"External URLs are not allowed in config: {value}"
 
