@@ -36,7 +36,6 @@ jobs:
           --health-retries 5
 
     env:
-      env:
       DB_URL: ${{ secrets.DB_URL }}
       REDIS_URL: ${{ secrets.REDIS_URL }}
       API_KEYS: ${{ secrets.API_KEYS }}
