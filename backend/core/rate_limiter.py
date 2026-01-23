@@ -52,7 +52,6 @@ class TieredRateLimiter(RedisRateLimiter):
             }
         
         return True, {"allowed": True, "remaining": remaining, "tier": user_tier.value}
-        return super().is_allowed(user_id, ip_address)
     def _check_limit(
             self,
             limit_type: str,
@@ -76,7 +75,7 @@ class TieredRateLimiter(RedisRateLimiter):
                 results = pipe.execute()
 
                 current_count = results[1]
-
+                print("COUNT:", current_count, "LIMIT:", max_requests)
                 if current_count + cost > max_requests:
                     for i in range(cost):
                         self.redis.zrem(key, f"{timestamp}: {i}")

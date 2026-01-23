@@ -36,7 +36,6 @@ jobs:
           --health-retries 5
 
     env:
-      env:
       DB_URL: ${{ secrets.DB_URL }}
       REDIS_URL: ${{ secrets.REDIS_URL }}
       API_KEYS: ${{ secrets.API_KEYS }}
@@ -67,6 +66,10 @@ jobs:
       - name: Run Integration Tests
         working-directory: backend
         run: pytest tests/integration -v --cov=backend --cov-append
+
+      - name: Run Security Tests
+        working-directory: backend
+        run: pytest tests/security -v --cov=backend --cov-append
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v3

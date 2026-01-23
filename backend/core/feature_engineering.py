@@ -1,7 +1,7 @@
 from typing import Dict, List, Any
 import numpy as np
 import structlog
-
+from numbers import Number as num
 logger = structlog.get_logger()
 
 class FeatureExtractor:
@@ -19,17 +19,15 @@ class FeatureExtractor:
             return self._extract_sklearn_features(config)
         else:
             logger.warning("feature_extraction: unkown job type", job_type=job_type)
-            return np.zeroes(len(self.feature_names))
+            return np.zeros(len(self.feature_names))
         
     def _extract_sklearn_features(self, config: Dict[str, Any]) -> np.ndarray:
-        n_estimators = config.get("n_estimators", 100)
-        dataset_rows = config.get("dataset_rws", 10000)
-        n_features = config.get("n_features", 20)
-        max_depth = config.get("max_depth", 10)
+        n_estimators = validate_config_input(config.get("n_estimators", 100))
+        dataset_rows = validate_config_input(config.get("dataset_rows", 10000))
+        n_features = validate_config_input(config.get("n_features", 20))
+        max_depth = validate_config_input(config.get("max_depth", 10))
 
-        model_complexity_score = (
-            n_estimators * max_depth * dataset_rows
-        ) / 1_000_000
+        model_complexity_score = (n_estimators * max_depth * dataset_rows) / 1_000_000 if isinstance(n_estimators,num) and isinstance(max_depth, num) and isinstance(dataset_rows, num) else 0
 
         features = np.array([
             n_estimators,
@@ -49,4 +47,10 @@ class FeatureExtractor:
         return features
     
     def get_feature_names(self) -> List[str]:
-        return self.features_names.copy()
+        return self.feature_names.copy()
+    
+def validate_config_input(value):
+    if isinstance(value, num) and value >= 0 and value != float('inf'):
+        return value
+    else:
+        return -1

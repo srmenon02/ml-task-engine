@@ -12,6 +12,7 @@ sys.path.insert(0, str(backend_dir))
 
 from models.database import base, get_db
 from api.main import app
+from api.main import app as fastapi_app
 from workers.celery_app import celery_app
 from freezegun import freeze_time
 import core.predictor
@@ -148,4 +149,7 @@ def reset_singletons():
 
     yield
 
+@pytest.fixture
+def test_app():
+    return fastapi_app
 
