@@ -503,7 +503,7 @@ def get_rate_limit_usage(user_id: str):
 
 @app.post("/admin/rate-limit/{user_id}/reset")
 def reset_rate_limit(user_id: str):
-    rate_limiter = get_rate_limiter()
+    rate_limiter = get_rate_limiter_dep()
     success = rate_limiter.reset(user_id)
 
     if success:
