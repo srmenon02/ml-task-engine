@@ -156,6 +156,8 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+
+
 class VersionDeprecationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -203,10 +205,6 @@ def root():
         "documentation": "/docs"
     }
 
-@app.get("/health")
-def health_check():
-    return {"status": "healthy"} 
-
 @app.post("/jobs", response_model=JobResponse, status_code=201)
 def create_job(
     job_data: JobCreate,
@@ -216,6 +214,7 @@ def create_job(
     rate_limiter = Depends(get_rate_limiter_dep)
     ):
     job_data.user_id = auth["user_id"]
+    request.state.user_id = auth["user_id"]
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
 
     client_ip = request.client.host if request.client else "unknown"
@@ -486,7 +485,7 @@ async def add_rate_limit_headers(request: Request, call_next):
     response = await call_next(request)
 
     if hasattr(request.state, "user_id"):
-        rate_limiter = get_rate_limiter()
+        rate_limiter = get_rate_limiter_dep()
         usage = rate_limiter.get_usage(request.state.user_id)
 
         if "error" not in usage:
@@ -498,7 +497,7 @@ async def add_rate_limit_headers(request: Request, call_next):
 
 @app.get("/admin/rate-limit/{user_id}")
 def get_rate_limit_usage(user_id: str):
-    rate_limiter = get_rate_limiter()
+    rate_limiter = get_rate_limiter_dep()
     usage = rate_limiter.get_usage(user_id)
     return usage
 
