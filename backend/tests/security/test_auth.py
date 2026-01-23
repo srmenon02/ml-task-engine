@@ -10,6 +10,7 @@ import base64
 class TestAPIKeyValidation:
     def test_valid_api_key_accepted(self):
         credentials = Mock(spec = HTTPAuthorizationCredentials)
+        credentials.scheme = "Bearer"
         credentials.credentials = "test_api_key_user123"
 
         result = verify_api_key(credentials)
@@ -19,6 +20,7 @@ class TestAPIKeyValidation:
 
     def test_invailid_api_key_rejected(self):
         credentials = Mock(spec = HTTPAuthorizationCredentials)
+        credentials.scheme = "Bearer"
         credentials.credentials = "invalid_api_key"
 
         with pytest.raises(HTTPException) as exc_info:
@@ -34,6 +36,7 @@ class TestAPIKeyValidation:
 
     def test_empty_api_key_rejected(self):
         credentials = Mock(spec = HTTPAuthorizationCredentials)
+        credentials.scheme = "Bearer"
         credentials.credentials = ""
 
         with pytest.raises(HTTPException) as exc_info:
@@ -42,6 +45,7 @@ class TestAPIKeyValidation:
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
     def test_api_key_extracts_user_id(self):
         credentials = Mock(spec = HTTPAuthorizationCredentials)
+        credentials.scheme = "Bearer"
         credentials.credentials = "test_api_key_user123"
 
         result = verify_api_key(credentials)
@@ -52,6 +56,7 @@ class TestAPIKeyValidation:
 
     def test_api_key_includes_permissions(self):
         credentials = Mock(spec = HTTPAuthorizationCredentials)
+        credentials.scheme = "Bearer"
         credentials.credentials = "test_api_key_user123"
 
         result = verify_api_key(credentials)
@@ -113,6 +118,7 @@ class TestAPIKeySecurity:
     ])
     def test_api_key_injection_attempts_blocked(self, suspicious_key):
         credentials = Mock(spec = HTTPAuthorizationCredentials)
+        credentials.scheme = "Bearer"
         credentials.credentials = suspicious_key
 
         with pytest.raises(HTTPException) as exc_info:
@@ -122,9 +128,11 @@ class TestAPIKeySecurity:
 
     def test_api_key_timing_attack_resistance(self):
         credentials_valid = Mock(spec = HTTPAuthorizationCredentials)
+        credentials_valid.scheme = "Bearer"
         credentials_valid.credentials = "test_api_key_user123"
 
         credentials_invalid = Mock(spec = HTTPAuthorizationCredentials)
+        credentials_invalid.scheme = "Bearer"
         credentials_invalid.credentials = "invalid_api_key"
 
         start_time_valid = time.time()
@@ -177,6 +185,7 @@ class TestAuthorizationChecks:
 
     def test_permission_based_access(self):
         credentials = Mock(spec = HTTPAuthorizationCredentials)
+        credentials.scheme = "Bearer"
         credentials.credentials = "test_api_key_user123"
 
         result = verify_api_key(credentials)

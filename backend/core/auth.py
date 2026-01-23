@@ -21,7 +21,7 @@ else:
 
 logger = structlog.get_logger()
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 def load_api_keys() -> Dict:
     keys_load = os.getenv("API_KEYS")
@@ -43,25 +43,21 @@ def hash_api_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode()).hexdigest()
 
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> Dict:
-    api_key = credentials.credentials if credentials else None
-
     if credentials is None:
-        logger.warning("Auth.Missing API Key")
-        raise HTTPException(
-            status_code = 401,
-            detail = "Unauthenticated"
-        )
+        raise HTTPException(status_code=401, detail="Unauthenticated")
+
+    if credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Invalid auth scheme")
+
+    api_key = credentials.credentials
+
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Missing API key")
 
     if api_key not in VALID_API_KEYS:
-        logger.warning("Auth.Invalid API Key Attempt", key_prefix=api_key[:8])
-        raise HTTPException(
-            status_code = 401,
-            detail = "Invalid API Key"
-        )
-    
-    user_info = VALID_API_KEYS[api_key]
-    logger.info("Authorized API Key", user_id = user_info["user_id"])
-    return user_info
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+
+    return VALID_API_KEYS[api_key]
 
 @dataclass
 class CurrentUser:
