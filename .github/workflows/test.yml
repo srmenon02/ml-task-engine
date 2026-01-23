@@ -68,6 +68,10 @@ jobs:
         working-directory: backend
         run: pytest tests/integration -v --cov=backend --cov-append
 
+      - name: Run Security Tests
+        working-directory: backend
+        run: pytest tests/security -v --cov=backend --cov-append
+
       - name: Upload Coverage
         uses: codecov/codecov-action@v3
         with:
