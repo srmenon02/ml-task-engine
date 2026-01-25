@@ -55,3 +55,16 @@ backend/tests/load/local_test_command.txt
 backend/.coverage
 .coverage
 gitingest.txt
+.env
+.env.local
+.env.production
+*.env.local
+.env.development
+.env.ci
+.env.example
+*env*
+startup_scripts/*
+docker-compose.prod.yml
+docker-compose.test.yml
+backend/startup_scripts/
+backend/load_env.sh
