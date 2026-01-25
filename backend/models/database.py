@@ -13,18 +13,45 @@ if ENV_PATH.exists():
 else:
     print(".env not found, using OS environment variables")
 
-db_url = os.environ.get("DB_URL")
+ENVIRONMENT = os.environ.get("ENVIRONMENT")
+
+if ENVIRONMENT == "production":
+    db_url = os.environ.get("DB_URL")
+elif ENVIRONMENT == "ci":
+    db_url = os.environ.get("DB_URL_CI")
+else:
+    db_url = os.environ.get("DB_URL_DEV")
+
+if not db_url:
+    raise ValueError(f"DATABASE URL env variable not set for {ENVIRONMENT}")
 
 if not db_url:
     raise ValueError("DATABASE URL env variable not set")
 
-engine = create_engine(
-    db_url,
-    pool_pre_ping = True,
-    pool_size=10,
-    max_overflow=20
-)
+if ENVIRONMENT == "development":
+    engine = create_engine(
+        db_url,
+        pool_pre_ping = True,
+        pool_size=10,
+        max_overflow=20
+    )
+elif ENVIRONMENT == "production":
+    engine = create_engine(
+        db_url,
+        pool_pre_ping = True,
+        pool_size=20,
+        max_overflow=40,
+        pool_recycle=3600,
+        echo = False
+    )
+else:
+    engine = create_engine(
+        db_url,
+        pool_pre_ping = True,
+        pool_size=10,
+    )
 
+print(f"ENGINE URL: {engine.url}")
 local_session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 base = declarative_base()
