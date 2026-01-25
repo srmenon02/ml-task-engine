@@ -55,3 +55,11 @@ backend/tests/load/local_test_command.txt
 backend/.coverage
 .coverage
 gitingest.txt
+.env
+.env.local
+.env.production
+*.env.local
+!.env.development
+!.env.ci
+!.env.example
+startup_scripts/*
