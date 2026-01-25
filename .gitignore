@@ -62,4 +62,5 @@ gitingest.txt
 .env.development
 .env.ci
 .env.example
+*.env*
 startup_scripts/*
