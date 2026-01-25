@@ -112,6 +112,7 @@ class SecurityValidator:
 
     ALLOWED_DOMAINS = ["localhost", "127.0.0.1", "mycompany.internal"]
 
+    @classmethod
     def validate_job(cls, job_type: str, config: Dict[str, Any]) -> tuple[bool, str]:
         if job_type not in cls.ALLOWED_JOB_TYPES:
             return False, f"Job Type {job_type} is not allowed."
