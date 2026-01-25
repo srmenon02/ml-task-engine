@@ -32,7 +32,7 @@ from core.logging_config import get_correlation_id, set_correlation_id, RequestL
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import JSONResponse, Response
 import secrets
-from fastapi import Request
+from fastapi import Request, Depends
 from fastapi.responses import HTMLResponse
 from core.metrics import track_request_metrics, track_job_metrics, jobs_submitted_total, MetricsCollector
 from core.health import HealthCheck, HealthStatus
@@ -215,6 +215,7 @@ def create_job(
     ):
     job_data.user_id = auth["user_id"]
     request.state.user_id = auth["user_id"]
+    request.state.rate_limter = rate_limiter
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
 
     client_ip = request.client.host if request.client else "unknown"
@@ -295,7 +296,15 @@ def create_job(
 
     logger.info("job queued", job_id = job.id)
 
-    return job
+    usage = rate_limiter.get_usage(job_data.user_id)
+    response_data = JobResponse.model_validate(job).model_dump(mode="json")
+    response = JSONResponse(content=response_data, status_code=201)
+    if "error" not in usage:
+        response.headers["X-RateLimit-Limit"] = str(usage["requests_limit"])
+        response.headers["X-RateLimit-Remaining"] = str(usage["requests_remaining"])
+        response.headers["X-RateLimit-Reset"] = str(usage["window_seconds"])
+
+    return response 
 
 @app.get("/jobs/{job_id}", response_model=JobResponse)
 def get_job(
@@ -480,12 +489,15 @@ def get_prediction_accuracy():
     return calculate_prediction_accuracy()
 
 
+def get_rate_limiter_for_middleware(rate_limiter=Depends(get_rate_limiter_dep)):
+    return rate_limiter
+
 @app.middleware("http")
 async def add_rate_limit_headers(request: Request, call_next):
     response = await call_next(request)
 
-    if hasattr(request.state, "user_id"):
-        rate_limiter = get_rate_limiter_dep()
+    if hasattr(request.state, "user_id") and hasattr(request.state, "rate_limiter"):
+        rate_limiter = get_rate_limiter_for_middleware()
         usage = rate_limiter.get_usage(request.state.user_id)
 
         if "error" not in usage:
