@@ -3,24 +3,30 @@ from fastapi import status
 import time
 from unittest.mock import patch, MagicMock
 from core.rate_limiter import TieredRateLimiter, UserTier
+from core.security import RedisRateLimiter
+from core import rate_limiter
+from api.main import app
+from core.security import get_rate_limiter_dep
 
 @pytest.mark.security
 class TestUserRateLimiting:
-    def test_rate_limit_headers_present(self, client, auth_headers, mock_redis):
-        pipeline = mock_redis.pipeline.return_value
+    def test_rate_limit_headers_present(self, client, auth_headers, override_rate_limiter):
+        pipeline = override_rate_limiter.redis.pipeline.return_value
         pipeline.execute.return_value = [0, 50, True, True]
+
         response = client.post(
             "/jobs",
             json = {
                 "job_type": "train_sklearn_model",
-                "config": {
-                    "n_estimators": 100
-                },
+                "config": {"n_estimators": 100},
                 "priority": 5
             },
             headers = auth_headers
         )
-        assert "X-RateLimit-Limit" in response.headers or response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+        print(f"Headers: {response.headers}")
+        assert "X-RateLimit-Limit" in response.headers or response.status_code == 429
+
     
     def test_rate_limit_retry_after_header(self, client, auth_headers, mock_redis):
         pipeline = mock_redis.pipeline.return_value

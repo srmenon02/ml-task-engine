@@ -121,6 +121,7 @@ class TestJobScheduler:
         scheduler.cancel_job(sample_job.id, cancelled_by = "admin")
 
         updated_job = test_db.get(Job, sample_job.id)
+        assert(test_db is not None)
         assert updated_job.cancelled_by == "admin"
         assert updated_job.cancelled_at is not None
 
