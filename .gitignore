@@ -59,7 +59,7 @@ gitingest.txt
 .env.local
 .env.production
 *.env.local
-!.env.development
-!.env.ci
-!.env.example
+.env.development
+.env.ci
+.env.example
 startup_scripts/*
