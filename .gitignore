@@ -68,3 +68,8 @@ docker-compose.prod.yml
 docker-compose.test.yml
 backend/startup_scripts/
 backend/load_env.sh
+backend/DEPLOYMENT_SETUP.md
+backend/QUICK_START.md
+backend/DEPLOYMENT_CHECKLIST.md
+*nginx*
+backend/api-generator.py
