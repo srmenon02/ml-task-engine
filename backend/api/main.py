@@ -38,19 +38,22 @@ from core.metrics import track_request_metrics, track_job_metrics, jobs_submitte
 from core.health import HealthCheck, HealthStatus
 from core.statistics import JobStatistics
 from core.error_tracking import get_error_tracker, ErrorSeverity
+from core.config import get_settings
 
 from api.v1 import v1_router
 from api.jobs import router as legacy_jobs_router
 
 logger = structlog.get_logger()
+settings = get_settings()
 
 app = FastAPI(
     title="Machine-Learning Task Engine API",
     description="Distributed Task Engine with ML-based Resource Prediction",
-    version="0.2.0",
+    version=settings.API_VERSION,
     docs_url = "/docs",
     redoc_url = "/redoc",
-    openapi_url = "/openapi.json"
+    openapi_url = "/openapi.json",
+    debug=settings.DEBUG
 )
 
 app.include_router(v1_router, prefix = "/api")
@@ -150,7 +153,7 @@ app.add_middleware(SecurityHeadersMiddleWare)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
