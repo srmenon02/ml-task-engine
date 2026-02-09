@@ -52,6 +52,7 @@ jobs:
       DEFAULT_USER_TIER: ${{ secrets.DEFAULT_USER_TIER }}
       MAX_PAGE_SIZE: ${{ secrets.MAX_PAGE_SIZE }}
       MAX_BULK_JOBS: ${{ secrets.MAX_BULK_JOBS }}
+      UVICORN_HOST: ${{ secrets.UVICORN_HOST }}
       CI: true
 
     steps:
