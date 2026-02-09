@@ -48,7 +48,10 @@ class Settings(BaseSettings):
 
     SENTRY_DSN: Optional[str] = Field(default = None, env = "SENTRY_DSN")
     PROMETHEUS_ENABLED: bool = Field(default = True, env = "PROMETHEUS_ENABLED")
+    
 
+    UVICORN_HOST: str = Field(default = "127.0.0.1", env = "UVICORN_HOST")
+    UVICORN_PORT: int = Field(default = 8000, env = "UVICORN_PORT")
     @field_validator("ENVIRONMENT")
     def validate_environment(cls, v):
         allowed = ["development", "staging", "production", "ci", "test"]
@@ -76,12 +79,15 @@ class Settings(BaseSettings):
 
 _settings: Optional[Settings] = None
 
+def reset_settings():
+    global _settings
+    _settings = None
+
 def get_settings() -> Settings:
     global _settings
     if _settings is None:
         env = os.getenv("ENVIRONMENT", "development")
         env_file = Path(f".env.{env}")
-
         if env_file.exists():
             _settings = Settings(_env_file=str(env_file))
         else:

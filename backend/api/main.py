@@ -8,6 +8,7 @@ from sqlalchemy import func
 from typing import List, Optional
 import structlog
 import sys
+import os
 import time
 import json
 from pathlib import Path
@@ -38,12 +39,13 @@ from core.metrics import track_request_metrics, track_job_metrics, jobs_submitte
 from core.health import HealthCheck, HealthStatus
 from core.statistics import JobStatistics
 from core.error_tracking import get_error_tracker, ErrorSeverity
-from core.config import get_settings
+from core.config import get_settings, reset_settings
 
 from api.v1 import v1_router
 from api.jobs import router as legacy_jobs_router
 
 logger = structlog.get_logger()
+reset_settings()
 settings = get_settings()
 
 app = FastAPI(
@@ -784,7 +786,9 @@ app.openapi = custom_openapi
 
 if __name__ == "__main__": 
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    host = os.getenv("UVICORN_HOST", "127.0.0.1")
+    port = int(os.getenv("UVICORN_PORT", "8000"))
+    uvicorn.run(app, host=host, port=port)
 
 
 
