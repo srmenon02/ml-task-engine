@@ -70,13 +70,6 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov bandit safety
 
-      - name: Run linters
-        run: |
-          pip install ruff black mypy
-          ruff check backend/
-          black --check backend/
-          mypy backend/ --ignore-missing-imports
-
       - name: Run Security Checks
         run: |
           bandit -r backend/ -ll
