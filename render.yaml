@@ -88,7 +88,7 @@ services:
     name: ml-task-engine-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
-    ipAllowList: [0.0.0.0/0]
+    ipAllowList: []
 
 
 databases:
