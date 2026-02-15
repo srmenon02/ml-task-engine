@@ -27,7 +27,7 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          name: ml-task-engine-REDIS_URL
+          name: ml-task-engine-redis
           type: redis 
           property: connectionString 
       - key: CELERY_BROKER_URL
