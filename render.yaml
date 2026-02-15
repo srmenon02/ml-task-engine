@@ -83,17 +83,18 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
-
-databases: 
-  - name: ml-task-engine-db
-    plan: free
-    databaseName: taskengine
-    user: taskengine
-
+        
   - type: redis
     name: ml-task-engine-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
+
+
+databases:
+  - name: ml-task-engine-db
+    plan: free
+    databaseName: taskengine
+    user: taskengine
 
 
   
