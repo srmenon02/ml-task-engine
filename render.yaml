@@ -83,11 +83,12 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
-        
+
   - type: redis
     name: ml-task-engine-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: [0.0.0.0/0]
 
 
 databases:
