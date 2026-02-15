@@ -1,0 +1,99 @@
+services:
+  - type: web
+    name: ml-task-engine-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend 
+    plan: free
+    healthCheckPath: /health 
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: JSON_LOGS
+        value: "true"
+      - key: RATE_LIMIT_ENABLED
+        value: true
+      - key: MAX_PAGE_SIZE
+        value: "100"
+      - key: MAX_BULK_JOBS
+        value: "100"
+      - key: DB_URL
+        fromDatabase:
+          name: ml-task-engine-db 
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: ml-task-engine-REDIS_URL
+          type: redis 
+          property: connectionString 
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: ml-task-engine-redis 
+          type: redis 
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: ml-task-engine-redis 
+          type: redis 
+          property: connectionString 
+      - key: API_KEYS
+        sync: false 
+      - key: SECRET_KEY
+        generateValue: true 
+    
+  - type: worker
+    name: ml-task-engine-worker
+    runtime: docker 
+    dockerfilePath: ./backend/Dockerfile.worker 
+    dockerContext: ./backend 
+    plan: free 
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: JSON_LOGS
+        value: "true"
+      - key: DB_URL
+        fromDatabase:
+          name: ml-task-engine-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: ml-task-engine-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: ml-task-engine-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: ml-task-engine-redis
+          type: redis
+          property: connectionString
+      - key: API_KEYS
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+
+databases: 
+  - name: ml-task-engine-db
+    plan: free
+    databaseName: taskengine
+    user: taskengine
+
+  - type: redis
+    name: ml-task-engine-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+
+
+  

@@ -1,3 +1,4 @@
+# backend/Dockerfile.worker
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -17,12 +18,7 @@ COPY --chown=appuser:appuser . .
 
 USER appuser
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD celery -A workers.celery_app inspect ping || exit 1
-
-CMD ["celery", "-A", "workers.celery_app", "worker" \
+CMD ["celery", "-A", "workers.celery_app", "worker", \
      "--loglevel=info", \
-     "--concurrency=4",  \
-     "max-tasks-per-child=100"]
-
-
+     "--concurrency=2", \
+     "--max-tasks-per-child=100"]
