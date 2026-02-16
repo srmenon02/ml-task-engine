@@ -46,7 +46,6 @@ else:
         pool_size=10,
     )
 
-print(f"ENGINE URL: {engine.url}")
 local_session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 base = declarative_base()
