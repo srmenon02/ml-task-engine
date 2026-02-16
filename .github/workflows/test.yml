@@ -155,7 +155,7 @@ jobs:
       - name: Build and push Worker image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile.worker
           push: true
           tags: ${{ steps.meta-worker.outputs.tags }}
