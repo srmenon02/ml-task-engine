@@ -9,7 +9,7 @@ on:
     types: [created]
 
 env:
-  REGISTRY: ghrc.io
+  REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
@@ -97,7 +97,7 @@ jobs:
     name: Build Docker Images
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name =='push' || github.event_name == 'release'
+    if: github.event_name == 'push' || github.event_name == 'release'
 
     permissions:
       contents: read
@@ -125,8 +125,8 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=semver, pattern={{version}}
-            type=semver, pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
             type=sha
 
       - name: Build and push API image
@@ -164,38 +164,55 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:buildcache,mode=max
 
   deploy-staging:
-    name: Deploy to Staging
+    name: Deploy to Render (Staging)
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: staging
-      url: https://staging.your-domain.com
+      url: https://ml-task-engine-api.onrender.com
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to staging
+      - name: Trigger Render Deploy
         run: |
-          echo "Deploying to staging environment..."
-          # Add your deployment script here
-          # Example: SSH to server and run docker-compose
+          curl -X POST \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": false}'
+
+      - name: Wait for deployment to be live
+        run: sleep 120
+
+      - name: Run smoke tests
+        run: |
+          curl -f https://ml-task-engine-api.onrender.com/health
+          curl -f -H "Authorization: Bearer ${{ secrets.RENDER_SMOKE_TEST_API_KEY }}" \
+            "https://ml-task-engine-api.onrender.com/api/v1/jobs?page=1&page_size=10"
 
   deploy-production:
-    name: Deploy to Production
+    name: Deploy to Render (Production)
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'release'
     environment:
       name: production
-      url: https://your-domain.com
+      url: https://ml-task-engine-api.onrender.com
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to production
+      - name: Trigger Render Deploy
         run: |
-          echo "Deploying to production environment..."
-          # Add your production deployment script
+          curl -X POST \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": false}'
+
+      - name: Wait for deployment to be live
+        run: sleep 120
+
+      - name: Run smoke tests
+        run: |
+          curl -f https://ml-task-engine-api.onrender.com/health
+          curl -f -H "Authorization: Bearer ${{ secrets.RENDER_SMOKE_TEST_API_KEY }}" \
+            "https://ml-task-engine-api.onrender.com/api/v1/jobs?page=1&page_size=10"
