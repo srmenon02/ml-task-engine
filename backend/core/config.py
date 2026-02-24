@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     API_VERSION: str = "2.0.0"
     API_PREFIX: str = "/api"
     CORS_ORIGINS: List[str] = Field(
-        ["http://localhost:3000"],
+        ["http://localhost:3000", "http://localhost:5173"],
         env = "CORS_ORIGIN"
     )
 
