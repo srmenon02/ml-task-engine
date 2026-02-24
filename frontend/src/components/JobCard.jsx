@@ -1,58 +1,165 @@
 import { Link } from 'react-router-dom';
 import JobStatusBadge from './JobStatusBadge';
 
-export default function JobCard({ job }) {
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
+export default function JobCard({ job, index = 0 }) {
+  const formatDate = (dateString) => {
+    if (!dateString) return '—';
+    const d = new Date(dateString);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
 
-    return (
-        <Link
-        to={`/jobs/${job.id}`}
-        className="block bg-white border rounded-lg p-4 hover:shadow-md transition-shadow"
-        >
-            <div className="flex items-start justify-between mb-3">
-                <div>
-                    <h3 className="font-semibold text-gray-900">Job #{job.id}</h3>
-                    <p className="text-sm text-gray-500">{job.job_type}</p>
-                </div>
-                <JobStatusBadge status={job.status} />
+  const priorityColor = (p) => {
+    if (p >= 15) return 'var(--red-signal)';
+    if (p >= 10) return 'var(--amber)';
+    if (p >= 5) return 'var(--blue-signal)';
+    return 'var(--text-muted)';
+  };
+
+  return (
+    <Link
+      to={`/jobs/${job.id}`}
+      style={{
+        display: 'block',
+        textDecoration: 'none',
+        backgroundColor: 'var(--bg-surface)',
+        border: '1px solid var(--border-dim)',
+        borderRadius: 'var(--radius-md)',
+        padding: '14px 18px',
+        transition: 'all 0.15s ease',
+        position: 'relative',
+        overflow: 'hidden',
+        animation: 'fadeSlideUp 0.4s ease forwards',
+        animationDelay: `${index * 0.04}s`,
+        opacity: 0,
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.backgroundColor = 'var(--bg-raised)';
+        e.currentTarget.style.borderColor = 'var(--border-mid)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
+        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.backgroundColor = 'var(--bg-surface)';
+        e.currentTarget.style.borderColor = 'var(--border-dim)';
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
+    >
+      {/* Ambient left border accent for running */}
+      {job.status === 'running' && (
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: '2px',
+          backgroundColor: 'var(--blue-signal)',
+          boxShadow: '0 0 8px var(--blue-signal)',
+        }} />
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+        {/* Left info */}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            {/* Job ID */}
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: '11px',
+              color: 'var(--text-muted)',
+              letterSpacing: '0.06em',
+            }}>
+              #{String(job.id).padStart(4, '0')}
+            </span>
+            {/* Job type */}
+            <span style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.01em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {job.job_type.replace(/_/g, ' ')}
+            </span>
+          </div>
+
+          {/* Config preview */}
+          {job.config && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {job.config.n_estimators && (
+                <ConfigPill label="n_est" value={job.config.n_estimators} />
+              )}
+              {job.config.dataset_rows && (
+                <ConfigPill label="rows" value={job.config.dataset_rows.toLocaleString()} />
+              )}
+              {job.config.model && (
+                <ConfigPill label="model" value={job.config.model} />
+              )}
             </div>
+          )}
+        </div>
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                    <p className="text-gray-500">Priority</p>
-                    <p className="font-medium text-gray-900">{job.priority}</p>
-                </div>
-                <div>
-                    <p className="text-gray-500">Created</p>
-                    <p className="font-medium text-gray-900">{formatDate(job.created_at)}</p>
-                </div>
+        {/* Right meta */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
+          <JobStatusBadge status={job.status} size="small" />
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* Priority */}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: '10px',
+                color: 'var(--text-faint)',
+                letterSpacing: '0.06em',
+                marginBottom: '2px',
+              }}>PRIORITY</div>
+              <div style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: priorityColor(job.priority),
+              }}>{job.priority}</div>
             </div>
+            {/* Created */}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: '10px',
+                color: 'var(--text-faint)',
+                letterSpacing: '0.06em',
+                marginBottom: '2px',
+              }}>CREATED</div>
+              <div style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+              }}>{formatDate(job.created_at)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
-            {job.config && (
-                <div className="mt-3 pt-3 border-t">
-                    <p className="text-xs text-gray-500 mb-1">Configuration</p>
-                    <div className="flex gap-4 text-xs">
-                        {job.config.n_estimators && (
-                            <span className="text-gray-700">
-                                <span className="font-medium">Estimators</span>: {job.config.n_estimators}
-                            </span>
-                        )}
-                        {job.config.dataset_rows && (
-                            <span className="text-gray-700">
-                                <span className="font-medium">Rows</span>: {job.config.dataset_rows.toLocaleString()}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            )}
-        </Link>
-    );
+function ConfigPill({ label, value }) {
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      padding: '2px 7px',
+      borderRadius: '2px',
+      backgroundColor: 'var(--bg-elevated)',
+      border: '1px solid var(--border-dim)',
+      fontFamily: 'var(--font-body)',
+      fontSize: '10px',
+    }}>
+      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{value}</span>
+    </span>
+  );
 }

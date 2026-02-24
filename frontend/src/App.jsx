@@ -6,19 +6,30 @@ import JobList from './pages/JobList';
 import JobDetail from './pages/JobDetail';
 import CreateJob from './pages/CreateJob';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      staleTime: 30000,
+    },
+  },
+});
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Navbar />
-        <main className="max-w-5xl mx-auto px-4 py-8">
+        <main style={{
+          maxWidth: '1100px',
+          margin: '0 auto',
+          padding: '0 24px',
+        }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/jobs" element={<JobList />} />
-            <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/jobs/new" element={<CreateJob />} />
+            <Route path="/jobs/:id" element={<JobDetail />} />
           </Routes>
         </main>
       </BrowserRouter>
