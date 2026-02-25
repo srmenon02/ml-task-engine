@@ -45,7 +45,7 @@ class DBTask(Task):
             self._db.close()
             self._db = None
 
-@celery_app.task(base=DBTask, bind=True, name="workers.task.execute_job")
+@celery_app.task(base=DBTask, bind=True, name="workers.task.execute_job", max_retries=2)
 def execute_job(self, job_id: int) -> Dict[str, Any]:
     logger.info("task.execute_job started", job_id=job_id, worker_id=self.request.id)
 
@@ -192,7 +192,7 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
                 job_id=job.id,
                 retry_count=job.retry_count,
             )
-
+            
             raise self.retry(exc=e, countdown=2 ** job.retry_count)
         
         track_job_metrics(

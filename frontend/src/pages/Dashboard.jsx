@@ -5,7 +5,7 @@ export default function Dashboard() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['systemStats'],
     queryFn: fetchSystemStats,
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   });
 
   return (

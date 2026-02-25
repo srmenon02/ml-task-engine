@@ -434,7 +434,9 @@ def get_worker_health(worker_id: str):
 
 @app.get("/system/stats")
 def get_system_stats(db: Session = Depends(get_db)):
-    total_jobs = db.query(func.count(Job.id)).scalar()
+    total_jobs = db.query(func.count(Job.id)).filter(
+        Job.status != JobStatus.CANCELED
+    ).scalar()
     completed_jobs = db.query(func.count(Job.id)).filter(
         Job.status == JobStatus.COMPLETED
     ).scalar()
@@ -446,6 +448,12 @@ def get_system_stats(db: Session = Depends(get_db)):
     ).scalar()
     running_jobs = db.query(func.count(Job.id)).filter(
         Job.status == JobStatus.RUNNING
+    ).scalar()
+    retrying_jobs = db.query(func.count(Job.id)).filter(
+        Job.status == JobStatus.RETRYING
+    ).scalar()
+    timeout_jobs = db.query(func.count(Job.id)).filter(
+        Job.status == JobStatus.TIMEOUT
     ).scalar()
 
     monitor = get_health_monitor()
@@ -459,6 +467,8 @@ def get_system_stats(db: Session = Depends(get_db)):
             "failed": failed_jobs,
             "pending": pending_jobs,
             "running": running_jobs,
+            "retrying": retrying_jobs,
+            "timeout": timeout_jobs,
             "success_rate": (completed_jobs / total_jobs * 100 if total_jobs > 0 else 0),
         },
         "workers": {
