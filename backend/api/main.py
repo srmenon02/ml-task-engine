@@ -456,9 +456,9 @@ def get_system_stats(db: Session = Depends(get_db)):
         Job.status == JobStatus.TIMEOUT
     ).scalar()
 
-    monitor = get_health_monitor()
-    workers = monitor.get_all_workers()
-    active_workers = sum(1 for w in workers if w["status"] == "active")
+    inspect = celery_app.control.inspect()
+    stats = inspect.stats() or {}
+    active_workers = len(stats)
 
     return {
         "jobs": {
@@ -472,9 +472,9 @@ def get_system_stats(db: Session = Depends(get_db)):
             "success_rate": (completed_jobs / total_jobs * 100 if total_jobs > 0 else 0),
         },
         "workers": {
-            "total": len(workers),
+            "total": active_workers,
             "active": active_workers,
-            "stale": len(workers) - active_workers
+            "stale": 0,
         },
     }
 
@@ -641,7 +641,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
     return JSONResponse(
         status_code = 500,
-        content = {"detail", "Internal Server Error"}
+        content = {"detail": "Internal Server Error"}
     )
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
