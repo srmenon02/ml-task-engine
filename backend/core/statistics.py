@@ -1,6 +1,6 @@
 import structlog
 from typing import Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, case
 from models import local_session, Job, Execution, JobStatus
 
@@ -122,7 +122,7 @@ class JobStatistics:
     def get_timeseries_stats(hours: int = 24) -> List[Dict]:
         db = local_session()
         try:
-            cutoff = datetime.now() - timedelta(hours = hours)
+            cutoff = datetime.now(timezone.utc) - timedelta(hours = hours)
 
             jobs = db.query(Job).filter(Job.created_at >= cutoff).all()
 

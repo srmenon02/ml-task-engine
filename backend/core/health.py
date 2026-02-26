@@ -1,7 +1,7 @@
 import psutil
 import structlog
 from typing import Dict, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import text
 from models import local_session
 import redis as redis_lib
@@ -18,11 +18,11 @@ class HealthCheck:
     def check_database() -> Dict:
         try:
             db = local_session()
-            start = datetime.now()
+            start = datetime.now(timezone.utc)
 
             result = db.execute(text("SELECT 1")).fetchone()
 
-            latency_ms = (datetime.now() - start).total_seconds() * 1000
+            latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
             db.close()
 
@@ -43,11 +43,11 @@ class HealthCheck:
     def check_redis(redis_url: str = "redis://localhost:6379/0") -> Dict:
         try:
             client = redis_lib.from_url(redis_url, socket_timeout = 5)
-            start = datetime.now()
+            start = datetime.now(timezone.utc)
 
             client.ping()
 
-            latency_ms = (datetime.now() - start).total_seconds() * 1000
+            latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
             info = client.info()
 
@@ -177,7 +177,7 @@ class HealthCheck:
 
         return {
             "status": overall_status,
-            "timestamp": datetime.now().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "checks": checks
         }
 

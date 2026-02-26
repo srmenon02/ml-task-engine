@@ -1,6 +1,6 @@
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 import psutil
 import time
@@ -69,7 +69,7 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
         return {"status": "cancelled", "job_id": job_id}
     
     job.status = JobStatus.RUNNING
-    job.started_at = datetime.now()
+    job.started_at = datetime.now(timezone.utc)
     db.commit()
 
     logger.info("task.running", job_id=job_id, job_type=job.job_type)
@@ -78,7 +78,7 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
         job_id = job_id,
         worker_id = self.request.id,
         execution_num = job.retry_count + 1,
-        started_at = datetime.now()
+        started_at = datetime.now(timezone.utc)
     )
 
     db.add(execution)
@@ -104,11 +104,11 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
         execution.actual_cpu_percent_max = cpu_max
         execution.actual_memory_mb_avg = memory_avg / (1024 * 1024)
         execution.actual_memory_mb_max = memory_max / (1024 * 1024)
-        execution.completed_at = datetime.now()
+        execution.completed_at = datetime.now(timezone.utc)
         execution.success = 1
 
         job.status = JobStatus.COMPLETED
-        job.completed_at = datetime.now()
+        job.completed_at = datetime.now(timezone.utc)
         job.results = result
 
         db.commit()
@@ -146,13 +146,13 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
         error_msg = f"Job exceeded time limit of {job.max_execution_time_sec} seconds"
         logger.error("task timeout", job_id=job_id, max_time = job.max_execution_time_sec)
 
-        execution.completed_at = datetime.now()
+        execution.completed_at = datetime.now(timezone.utc)
         execution.success = 0
         execution.error_msg = error_msg
 
         job.status = JobStatus.TIMEOUT
         job.error_message = error_msg
-        job.completed_at = datetime.now()
+        job.completed_at = datetime.now(timezone.utc)
 
         db.commit()
 
@@ -172,13 +172,13 @@ def execute_job(self, job_id: int) -> Dict[str, Any]:
             traceback=error_trace,
         )
 
-        execution.completed_at = datetime.now()
+        execution.completed_at = datetime.now(timezone.utc)
         execution.success = 0
         execution.error_msg = error_msg
 
         job.status = JobStatus.FAILED
         job.error_msg = error_msg
-        job.completed_at = datetime.now()
+        job.completed_at = datetime.now(timezone.utc)
 
         db.commit()
 

@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Query
 from sqlalchemy import cast, String
@@ -53,7 +53,7 @@ class DateRangePreset(str):
     LAST_30D = "last_30d"
 
 def get_date_range_from_preset(preset: DateRangePreset) -> tuple[datetime, datetime]:
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     ranges = {
         DateRangePreset.LAST_HOUR: timedelta(hours = 1),

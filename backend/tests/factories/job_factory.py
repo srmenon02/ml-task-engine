@@ -1,7 +1,7 @@
 import factory
 from factory.alchemy import SQLAlchemyModelFactory
 from factory import fuzzy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 
 from models import Job, JobStatus, JobPriority
@@ -28,5 +28,5 @@ class JobFactory(SQLAlchemyModelFactory):
     predicted_cpu_percent = fuzzy.FuzzyFloat(10.0, 80.0)
     predicted_memory_db = fuzzy.FuzzyFloat(100.0, 2000.0)
 
-    created_at = factory.LazyAttribute(lambda _: datetime.now())
+    created_at = factory.LazyAttribute(lambda _: datetime.now(timezone.utc))
     

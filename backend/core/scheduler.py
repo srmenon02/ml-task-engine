@@ -1,6 +1,6 @@
 from typing import Optional
 import structlog
-from datetime import datetime
+from datetime import datetime, timezone
 
 from models import local_session, Job, JobStatus, JobPriority
 from workers.tasks import execute_job
@@ -56,7 +56,7 @@ class JobScheduler:
             
             job.status = JobStatus.CANCELED
             job.cancelled_by = cancelled_by
-            job.cancelled_at = datetime.now()
+            job.cancelled_at = datetime.now(timezone.utc)
             db.commit()
 
             if job.status == JobStatus.RUNNING:

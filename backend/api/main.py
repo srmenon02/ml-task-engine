@@ -12,7 +12,7 @@ import os
 import time
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
@@ -552,7 +552,7 @@ def metrics():
 def health_check():
     return {
         "status": "healthy",
-        "timestampe": datetime.now().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @app.get("/health/live")
