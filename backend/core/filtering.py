@@ -10,7 +10,7 @@ class JobFilters(BaseModel):
     job_type: Optional[str] = Field(None, description = "Filter by Job Type")
     priority_min: Optional[int] = Field(None, ge=0, le=20, description = "Minimum Priority")
     priority_max: Optional[int] = Field(None, ge=0, le=20, description = "Maximum Priority")
-    created_afer: Optional[datetime] = Field(None, description = "Created After Timestamp")
+    created_after: Optional[datetime] = Field(None, description = "Created After Timestamp")
     created_before: Optional[datetime] = Field(None, description = "Created Before Timestamp")
     search: Optional[str] = Field(None, description = "Search in config (JSON)")
 
@@ -30,8 +30,8 @@ def apply_job_filters(query: Query, filters: JobFilters, user_id: str) -> Query:
     if filters.priority_max:
         query = query.filter(Job.priority <= filters.priority_max)
 
-    if filters.created_afer:
-        query = query.filter(Job.created_at >= filters.created_afer)
+    if filters.created_after:
+        query = query.filter(Job.created_at >= filters.created_after)
 
     if filters.created_before:
         query = query.filter(Job.created_at <= filters.created_before)
