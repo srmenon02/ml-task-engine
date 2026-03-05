@@ -126,7 +126,7 @@ export default function CreateJob() {
             label="n_estimators"
             description="Number of decision trees"
             value={formData.n_estimators}
-            min={1} max={1000000}
+            min={1} max={100000}
             delay={0.1}
             onChange={(v) => setFormData({ ...formData, n_estimators: v })}
           />
@@ -134,7 +134,7 @@ export default function CreateJob() {
             label="dataset_rows"
             description="Synthetic training samples"
             value={formData.dataset_rows}
-            min={1} max={10000000}
+            min={1} max={1000000}
             delay={0.14}
             onChange={(v) => setFormData({ ...formData, dataset_rows: v })}
           />
