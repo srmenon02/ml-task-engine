@@ -2,11 +2,15 @@ import { Link } from 'react-router-dom';
 import JobStatusBadge from './JobStatusBadge';
 
 export default function JobCard({ job, index = 0 }) {
-  const formatDate = (dateString) => {
-    if (!dateString) return '—';
-    const d = new Date(dateString);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const formatDate = (ds) => {
+    if (!ds) return '—';
+    const utcString = ds.endsWith('Z') || ds.includes('+') ? ds : ds + 'Z';
+    const d = new Date(utcString);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      + ' · ' + d.toLocaleTimeString('en-US', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: true,
+      });
   };
 
   const priorityColor = (p) => {

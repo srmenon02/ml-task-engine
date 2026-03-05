@@ -27,9 +27,13 @@ export default function JobDetail() {
 
   const formatDate = (ds) => {
     if (!ds) return '—';
-    const d = new Date(ds);
+    const utcString = ds.endsWith('Z') || ds.includes('+') ? ds : ds + 'Z';
+    const d = new Date(utcString);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      + ' · ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      + ' · ' + d.toLocaleTimeString('en-US', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: true,
+      });
   };
 
   const formatDuration = (start, end) => {

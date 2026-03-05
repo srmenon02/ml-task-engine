@@ -45,3 +45,5 @@ class JobResponse(BaseModel):
     cancelled_by: Optional[str]
     cancelled_at: Optional[datetime] = None
     error_message: str = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
