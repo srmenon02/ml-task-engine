@@ -29,8 +29,8 @@ class SecurityValidator:
         "sleep",
     }
 
-    MAX_N_ESTIMATORS = 1000000
-    MAX_DATASET_ROWS = 10000000
+    MAX_N_ESTIMATORS = 100000
+    MAX_DATASET_ROWS = 1000000
     MAX_SLEEP_SECONDS = 60 * 60 * 24
 
     DANGEROUS_PATTERNS = [

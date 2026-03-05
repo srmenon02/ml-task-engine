@@ -55,6 +55,9 @@ class ResourcePredictor:
             memory_mb = self.memory_model.predict(features_scaled)[0]
             cpu_percent = self.cpu_model.predict(features_scaled)[0]
 
+            memory_mb = max(memory_mb, 50.0)
+            cpu_percent = max(0.0, min(cpu_percent, 100.0))
+
             logger.info(
                 "predictor predicted",
                 memory_mb = memory_mb,
