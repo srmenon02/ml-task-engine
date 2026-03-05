@@ -1,6 +1,6 @@
 import structlog
 from typing import Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from enum import Enum
 
@@ -32,7 +32,7 @@ class ErrorTracker:
             user_id: str = None,
     ):
         error_record = {
-            "timestamp": datetime.now(),
+            "timestamp": datetime.now(timezone.utc),
             "type": error_type,
             "message": error_message,
             "severity": severity,
@@ -68,7 +68,7 @@ class ErrorTracker:
         )
 
     def get_error_summary(self, hours: int = 1) -> Dict:
-        cutoff = datetime.now() - timedelta(hours = hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours = hours)
 
         recent_errors = [
             error for error in self.errors if error["timestamp"] >= cutoff
@@ -90,7 +90,7 @@ class ErrorTracker:
         }
     
     def get_error_rate(self, minutes: int = 5) -> float:
-        cutoff = datetime.now() - timedelta(minutes = minutes)
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes = minutes)
 
         recent_errors = [
             error for error in self.errors if error["timestamp"] >= cutoff

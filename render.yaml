@@ -90,7 +90,17 @@ services:
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
-
+  - type: web
+    name: ml-task-engine-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://ml-task-engine-api.onrender.com
+      - key: VITE_API_KEY
+        sync: false
+        
 databases:
   - name: ml-task-engine-db
     plan: free

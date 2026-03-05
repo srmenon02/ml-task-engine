@@ -1,5 +1,5 @@
 import structlog
-from datetime import datetime
+from datetime import datetime, timezone
 from models import local_session
 from sqlalchemy import Column, Integer, String, DateTime, JSON
 from models.database import base
@@ -10,7 +10,7 @@ class AuditLog(base):
     __tablename__ = "audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.now(), nullable=False)
+    timestamp = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     event_type = Column(String, nullable=False, index=True)
     user_id = Column(String, nullable=False, index=True)
     ip_address = Column(String, nullable=True)

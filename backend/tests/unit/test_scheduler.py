@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, Mock
-from datetime import datetime
+from datetime import datetime, timezone
 from models import Job, JobStatus, JobPriority
 from core.scheduler import JobScheduler, get_scheduler
 
@@ -96,7 +96,7 @@ class TestJobScheduler:
             status=JobStatus.CANCELED,
             priority=JobPriority.NORMAL.value,
             cancelled_by="user",
-            cancelled_at=datetime.now(),
+            cancelled_at=datetime.now(timezone.utc),
         )
 
         test_db.add(cancelled_job)

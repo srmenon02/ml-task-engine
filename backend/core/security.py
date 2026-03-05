@@ -4,7 +4,7 @@ import re
 import redis
 import structlog
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 import urllib.parse
 logger = structlog.get_logger()
 
@@ -29,8 +29,8 @@ class SecurityValidator:
         "sleep",
     }
 
-    MAX_N_ESTIMATORS = 1000000
-    MAX_DATASET_ROWS = 10000000
+    MAX_N_ESTIMATORS = 100000
+    MAX_DATASET_ROWS = 1000000
     MAX_SLEEP_SECONDS = 60 * 60 * 24
 
     DANGEROUS_PATTERNS = [
@@ -218,7 +218,7 @@ class RedisRateLimiter:
             user_id: str,
             ip_address: Optional[str] = None,
     ) -> tuple[bool, Dict[str, Any]]:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         timestamp = now.timestamp()
 
         checks = [
@@ -292,7 +292,7 @@ class RedisRateLimiter:
             return True, max_requests
         
     def get_usage(self, user_id: str) -> Dict[str, Any]:
-        now = datetime.now().timestamp()
+        now = datetime.now(timezone.utc).timestamp()
         user_key = self._get_key("user", user_id)
 
         try:

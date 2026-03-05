@@ -12,7 +12,7 @@ import os
 import time
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
@@ -434,7 +434,9 @@ def get_worker_health(worker_id: str):
 
 @app.get("/system/stats")
 def get_system_stats(db: Session = Depends(get_db)):
-    total_jobs = db.query(func.count(Job.id)).scalar()
+    total_jobs = db.query(func.count(Job.id)).filter(
+        Job.status != JobStatus.CANCELED
+    ).scalar()
     completed_jobs = db.query(func.count(Job.id)).filter(
         Job.status == JobStatus.COMPLETED
     ).scalar()
@@ -447,10 +449,16 @@ def get_system_stats(db: Session = Depends(get_db)):
     running_jobs = db.query(func.count(Job.id)).filter(
         Job.status == JobStatus.RUNNING
     ).scalar()
+    retrying_jobs = db.query(func.count(Job.id)).filter(
+        Job.status == JobStatus.RETRYING
+    ).scalar()
+    timeout_jobs = db.query(func.count(Job.id)).filter(
+        Job.status == JobStatus.TIMEOUT
+    ).scalar()
 
-    monitor = get_health_monitor()
-    workers = monitor.get_all_workers()
-    active_workers = sum(1 for w in workers if w["status"] == "active")
+    inspect = celery_app.control.inspect()
+    stats = inspect.stats() or {}
+    active_workers = len(stats)
 
     return {
         "jobs": {
@@ -459,12 +467,14 @@ def get_system_stats(db: Session = Depends(get_db)):
             "failed": failed_jobs,
             "pending": pending_jobs,
             "running": running_jobs,
+            "retrying": retrying_jobs,
+            "timeout": timeout_jobs,
             "success_rate": (completed_jobs / total_jobs * 100 if total_jobs > 0 else 0),
         },
         "workers": {
-            "total": len(workers),
+            "total": active_workers,
             "active": active_workers,
-            "stale": len(workers) - active_workers
+            "stale": 0,
         },
     }
 
@@ -542,7 +552,7 @@ def metrics():
 def health_check():
     return {
         "status": "healthy",
-        "timestampe": datetime.now().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @app.get("/health/live")
@@ -631,7 +641,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
     return JSONResponse(
         status_code = 500,
-        content = {"detail", "Internal Server Error"}
+        content = {"detail": "Internal Server Error"}
     )
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):

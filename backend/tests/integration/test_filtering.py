@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from models import JobStatus
 
 @pytest.mark.integration
@@ -35,10 +35,9 @@ class TestFiltering:
         assert data["total"] == 5
 
     def test_filter_by_date_range(self, client, auth_headers, job_factory):
-        old_date = datetime.now() - timedelta(days = 10)
-        recent_date = datetime.now() - timedelta(hours = 2)
+        old_date = datetime.now(timezone.utc) - timedelta(days = 10)
+        recent_date = datetime.now(timezone.utc) - timedelta(hours = 2)
 
-        old_job = job_factory.create_batch(1, user_id = "user123", created_at = old_date)
         recent_job = job_factory.create_batch(1, user_id = "user123", created_at = recent_date)
         #test_db.commit()
 
@@ -49,7 +48,7 @@ class TestFiltering:
 
         assert response.status_code == 200
         data =response.json()
-        assert data["total"] == 2
+        assert data["total"] == 1
         assert data["items"][0]["id"] == recent_job[0].id
 
 

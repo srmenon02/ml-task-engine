@@ -2,7 +2,7 @@ from enum import Enum
 from core.security import RedisRateLimiter
 import os
 from typing import Dict, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import redis
 import structlog
 
@@ -32,7 +32,7 @@ class TieredRateLimiter(RedisRateLimiter):
     ) -> tuple[bool, Dict[str, Any]]:
         user_limit = self.TIER_LIMITS[user_tier]
 
-        now = datetime.now().timestamp()
+        now = datetime.now(timezone.utc).timestamp()
 
         allowed, remaining = self._check_limit(
             "user",

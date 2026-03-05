@@ -5,7 +5,7 @@ from unittest.mock import patch
 from workers.tasks import execute_job
 from workers.tasks import _execute_job_with_limits, _store_resource_profile
 import psutil
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 from unittest.mock import patch
 logger = structlog.get_logger()
@@ -21,11 +21,11 @@ class TestJobLifecycle:
             queued_jobs.append(job_id)
             job = test_db.query(Job).filter(Job.id == job_id).first()
             job.status = JobStatus.RUNNING
-            job.started_at = datetime.now()
+            job.started_at = datetime.now(timezone.utc)
             test_db.commit()
             
             job.status = JobStatus.COMPLETED
-            job.completed_at = datetime.now()
+            job.completed_at = datetime.now(timezone.utc)
             job.results = {
                 "model_type": "RandomForest",
                 "accuracy": 0.95,
