@@ -147,7 +147,6 @@ class SecurityHeadersMiddleWare(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'"
 
         return response
 
@@ -174,7 +173,6 @@ class VersionDeprecationMiddleware(BaseHTTPMiddleware):
         response.headers["X-API-Version"] = "2.0.0"
 
         return response
-app.add_middleware(VersionDeprecationMiddleware)
 
 class CSPMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -196,7 +194,17 @@ class CSPMiddleware(BaseHTTPMiddleware):
             )
 
         return response
-app.add_middleware(CSPMiddleware)  
+
+app.add_middleware(CSPMiddleware)
+app.add_middleware(VersionDeprecationMiddleware)
+app.add_middleware(SecurityHeadersMiddleWare)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 @app.get("/")
 def root():
