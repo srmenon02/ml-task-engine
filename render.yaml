@@ -21,6 +21,8 @@ services:
         value: "100"
       - key: MAX_BULK_JOBS
         value: "100"
+      - key: CORS_ORIGIN
+        value: https://ml-task-engine-frontend.onrender.com
       - key: DB_URL
         fromDatabase:
           name: ml-task-engine-db 
@@ -93,8 +95,9 @@ services:
   - type: web
     name: ml-task-engine-frontend
     runtime: static
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: frontend/dist
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
         value: https://ml-task-engine-api.onrender.com
