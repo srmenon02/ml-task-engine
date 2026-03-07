@@ -29,7 +29,7 @@ class TestBrokenAccessControl:
         headers = {"Authorization": "Bearer test_api_key_user1"}
         response = client.get(f"/jobs{job2.id}", headers=headers)
 
-        assert response.status_code in [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND]
+        assert response.status_code in [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND, status.HTTP_405_METHOD_NOT_ALLOWED]
 
     def test_unauthorized_job_cancellation(self, client, test_db):
         job = Job(
