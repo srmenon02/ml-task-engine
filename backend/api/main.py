@@ -66,18 +66,6 @@ app.include_router(
     deprecated = True
 )
 
-@app.options("/{rest_of_path:path}")
-async def preflight_handler(rest_of_path: str, request: Request):
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-            "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Authorization, Content-Type",
-            "Access-Control-Allow-Credentials": "true",
-        }
-    )
-
 @app.middleware("http")
 async def log_requests(request, call_next):
     logger.info(
@@ -169,7 +157,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_methods=["*"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
