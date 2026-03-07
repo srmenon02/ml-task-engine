@@ -21,7 +21,7 @@ services:
         value: "100"
       - key: MAX_BULK_JOBS
         value: "100"
-      - key: CORS_ORIGIN
+      - key: CORS_ORIGINS
         value: https://ml-task-engine-frontend.onrender.com
       - key: DB_URL
         fromDatabase:
