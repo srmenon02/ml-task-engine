@@ -190,13 +190,6 @@ jobs:
           curl -f -H "Authorization: Bearer ${{ secrets.RENDER_SMOKE_TEST_API_KEY }}" \
             "https://ml-task-engine-api.onrender.com/api/v1/jobs?page=1&page_size=10"
 
-      - name: Trigger Render Frontend Deploy
-        run: |
-          curl -X POST \
-            "https://api.render.com/v1/services/${{ secrets.RENDER_FRONTEND_SERVICE_ID }}/deploys" \
-            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-            -H "Content-Type: application/json" \
-
   deploy-production:
     name: Deploy to Render (Production)
     runs-on: ubuntu-latest
