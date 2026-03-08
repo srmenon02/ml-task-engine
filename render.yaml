@@ -100,7 +100,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://ml-task-engine-api.onrender.com
+        value: https://ml-task-engine-api.onrender.com/api/v1
       - key: VITE_API_KEY
         sync: false
         
