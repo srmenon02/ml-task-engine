@@ -198,13 +198,6 @@ class CSPMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CSPMiddleware)
 app.add_middleware(VersionDeprecationMiddleware)
 app.add_middleware(SecurityHeadersMiddleWare)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Authorization", "Content-Type"],
-)
 
 @app.get("/")
 def root():
