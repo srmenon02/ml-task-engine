@@ -112,6 +112,11 @@ class SecurityValidator:
 
     ALLOWED_DOMAINS = ["localhost", "127.0.0.1", "mycompany.internal"]
 
+    SUPPORTED_MODELS = {
+            "RandomForest", "LogisticRegression", "SVC", 
+            "GradientBoosting", "DecisionTree", "KNeighbors"
+    }
+
     @classmethod
     def validate_job(cls, job_type: str, config: Dict[str, Any]) -> tuple[bool, str]:
         if job_type not in cls.ALLOWED_JOB_TYPES:
@@ -170,8 +175,8 @@ class SecurityValidator:
         if dataset_rows < 1 or dataset_rows > cls.MAX_DATASET_ROWS:
             return False, f"dataset_rows must be between 1-{cls.MAX_DATASET_ROWS}"
         
-        model = config.get("mode", "RandomForest")
-        if model not in {"RandomForest"}:
+        model = config.get("model", "RandomForest")
+        if model not in cls.SUPPORTED_MODELS:
             return False, f"Model type {model} is not supported"
         
         return True, ""
