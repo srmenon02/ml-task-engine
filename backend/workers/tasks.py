@@ -22,6 +22,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
 import numpy as np
 
 import threading
@@ -317,10 +322,31 @@ def _train_sklearn_model(
 
     start = time.time()
 
-    if model_type == "RandomForest":
-        model = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
-    else:
+    MODEL_MAP = {
+        "RandomForest": lambda cfg: RandomForestClassifier(
+            n_estimators=cfg.get("n_estimators", 100), random_state=42
+        ),
+        "GradientBoosting": lambda cfg: GradientBoostingClassifier(
+            n_estimators=cfg.get("n_estimators", 100), random_state=42
+        ),
+        "LogisticRegression": lambda cfg: LogisticRegression(
+            max_iter=cfg.get("max_iter", 1000), random_state=42
+        ),
+        "SVC": lambda cfg: SVC(
+            C=cfg.get("C", 1.0), kernel=cfg.get("kernel", "rbf"), random_state=42
+        ),
+        "DecisionTree": lambda cfg: DecisionTreeClassifier(
+            max_depth=cfg.get("max_depth", None), random_state=42
+        ),
+        "KNeighbors": lambda cfg: KNeighborsClassifier(
+            n_neighbors=cfg.get("n_neighbors", 5)
+        ),
+    }
+
+    if model_type not in MODEL_MAP:
         raise ValueError(f"Unsupported model type: {model_type}")
+
+    model = MODEL_MAP[model_type](config)
 
 
     model.fit(X_train, y_train)

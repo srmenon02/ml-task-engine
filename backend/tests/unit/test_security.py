@@ -88,5 +88,44 @@ class TestRateLimiter:
         assert allowed is True
         assert mock_redis.pipeline.called
 
+class TestModelValidation:
+    @pytest.fixture
+    def validator(self):
+        return SecurityValidator()
+
+    @pytest.mark.parametrize("model", [
+        "RandomForest",
+        "LogisticRegression",
+        "GradientBoosting",
+        "SVC",
+        "DecisionTree",
+        "KNeighbors",
+    ])
+    def test_valid_models_accepted(self, validator, model):
+        is_valid, error = validator.validate_job(
+            "train_sklearn_model",
+            {
+                "model": model,
+                "n_estimators": 100,
+                "dataset_rows": 1000,
+            }
+        )
+        assert is_valid is True
+        assert error == ""
+
+    def test_invalid_model_rejected(self, validator):
+        is_valid, error = validator.validate_job(
+            "train_sklearn_model",
+            {"model": "XGBoost", "n_estimators": 100, "dataset_rows": 1000}
+        )
+        assert is_valid is False
+        assert "not supported" in error.lower()
+
+    def test_missing_model_defaults_to_random_forest(self, validator):
+        is_valid, error = validator.validate_job(
+            "train_sklearn_model",
+            {"n_estimators": 100, "dataset_rows": 1000}
+        )
+        assert is_valid is True
 
 

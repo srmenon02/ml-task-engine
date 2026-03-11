@@ -4,6 +4,14 @@ import structlog
 from numbers import Number as num
 logger = structlog.get_logger()
 
+MODEL_COMPLEXITY = {
+    "LogisticRegression": 1,
+    "DecisionTree": 2,
+    "KNeighbors": 3,
+    "RandomForest": 5,
+    "GradientBoosting": 7,
+    "SVC": 4,
+}
 class FeatureExtractor:
     def __init__(self):
         self.feature_names = [
@@ -12,6 +20,7 @@ class FeatureExtractor:
             "n_features",
             "max_depth",
             "model_complexity_score",
+            "model_complexity_rank",
         ]
 
     def extract(self, config: Dict[str, Any], job_type: str) -> np.ndarray:
@@ -27,21 +36,27 @@ class FeatureExtractor:
         n_features = validate_config_input(config.get("n_features", 20))
         max_depth = validate_config_input(config.get("max_depth", 10))
 
+        model_name = config.get("model", "RandomForest")
+        model_complexity_rank = MODEL_COMPLEXITY.get(model_name, 0)
+
         model_complexity_score = (n_estimators * max_depth * dataset_rows) / 1_000_000 if isinstance(n_estimators,num) and isinstance(max_depth, num) and isinstance(dataset_rows, num) else 0
+        adjusted_complexity_score = model_complexity_score * (model_complexity_rank / 5)
 
         features = np.array([
             n_estimators,
             dataset_rows,
             n_features,
             max_depth,
-            model_complexity_score,
+            adjusted_complexity_score,
+            float(model_complexity_rank),
         ], dtype=np.float64)
 
         logger.debug(
             "features.extracted",
             n_estimators = n_estimators,
             dataset_rows = dataset_rows,
-            complexity_score = model_complexity_score,
+            complexity_score = adjusted_complexity_score,
+            model_rank = model_complexity_rank,
         )
 
         return features

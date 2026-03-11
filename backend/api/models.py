@@ -18,7 +18,7 @@ class JobCreate(BaseModel):
             "example": {
                 "job_type": "train_sklearn_model",
                 "config": {
-                    "model": "RandomForest",
+                    "model": "Configurable: RandomForest, LogisticRegression, SVC, GradientBoosting, DecisionTree, KNeighbors",
                     "n_estimators": 100,
                     "dataset_rows": 10000
                 }
