@@ -52,3 +52,28 @@ class TestJobAPI:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.parametrize("model,extra_config", [
+        ("RandomForest",       {"n_estimators": 10}),
+        ("GradientBoosting",   {"n_estimators": 10}),
+        ("LogisticRegression", {"max_iter": 100}),
+        ("SVC",                {"C": 1.0}),
+        ("DecisionTree",       {"max_depth": 3}),
+        ("KNeighbors",         {"n_neighbors": 3}),
+    ])
+    def test_all_model_types_accepted(self, client, auth_headers, model, extra_config):
+        response = client.post(
+            "/jobs",
+            json={
+                "job_type": "train_sklearn_model",
+                "config": {
+                    "model": model,
+                    "dataset_rows": 100,
+                    **extra_config,
+                },
+                "priority": 5,
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 201
+        assert response.json()["status"] == "pending"
