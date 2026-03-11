@@ -37,7 +37,7 @@ class FeatureExtractor:
         max_depth = validate_config_input(config.get("max_depth", 10))
 
         model_name = config.get("model", "RandomForest")
-        model_complexity_rank = MODEL_COMPLEXITY.get(model_name, 0)
+        model_complexity_rank = MODEL_COMPLEXITY.get(model_name, 5)
 
         model_complexity_score = (n_estimators * max_depth * dataset_rows) / 1_000_000 if isinstance(n_estimators,num) and isinstance(max_depth, num) and isinstance(dataset_rows, num) else 0
         adjusted_complexity_score = model_complexity_score * (model_complexity_rank / 5)

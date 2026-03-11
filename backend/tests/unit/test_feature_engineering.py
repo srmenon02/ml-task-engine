@@ -52,7 +52,7 @@ class TestFeatureExtractor:
         simple_features = extractor.extract(simple_config, "train_sklearn_model")
         complex_features = extractor.extract(complex_config, "train_sklearn_model")
 
-        assert simple_features[-1] < complex_features[-1]
+        assert simple_features[4] < complex_features[4]
 
     def test_feature_scaling(self, extractor):
         config = {
@@ -91,7 +91,7 @@ class TestFeatureExtractor:
             "max_depth": 10,
         }
         features = extractor.extract(config, "train_sklearn_model")
-        complexity = features[-1]
+        complexity = features[4]
 
         if expected_complexity_order == "low":
             assert complexity < 10
@@ -127,3 +127,40 @@ class TestFeatureExtractor:
 
         assert isinstance(features, np.ndarray)
         assert np.all(np.isfinite(features))
+
+class TestModelComplexityRank:
+    @pytest.fixture
+    def extractor(self):
+        return FeatureExtractor()
+
+    def test_feature_vector_is_six_elements(self, extractor):
+        config = {"model": "RandomForest", "n_estimators": 100, "dataset_rows": 10000}
+        features = extractor.extract(config, "train_sklearn_model")
+        assert len(features) == 6
+
+    @pytest.mark.parametrize("lighter,heavier", [
+        ("LogisticRegression", "RandomForest"),
+        ("RandomForest", "GradientBoosting"),
+        ("DecisionTree", "SVC"),
+    ])
+    def test_heavier_models_produce_higher_rank(self, extractor, lighter, heavier):
+        config = {"n_estimators": 100, "dataset_rows": 10000, "max_depth": 10}
+
+        light_features = extractor.extract({**config, "model": lighter}, "train_sklearn_model")
+        heavy_features = extractor.extract({**config, "model": heavier}, "train_sklearn_model")
+
+        assert light_features[5] < heavy_features[5]
+
+    def test_unknown_model_gets_default_rank(self, extractor):
+        config = {"model": "SomeNewModel", "n_estimators": 100, "dataset_rows": 10000, "max_depth": 10}
+        features = extractor.extract(config, "train_sklearn_model")
+        assert features[5] == 5.0
+        assert np.all(np.isfinite(features))
+
+    def test_adjusted_complexity_scales_with_model(self, extractor):
+        config = {"n_estimators": 100, "dataset_rows": 10000, "max_depth": 10}
+
+        lr_features = extractor.extract({**config, "model": "LogisticRegression"}, "train_sklearn_model")
+        gb_features = extractor.extract({**config, "model": "GradientBoosting"}, "train_sklearn_model")
+
+        assert lr_features[4] < gb_features[4]
