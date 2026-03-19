@@ -432,27 +432,39 @@ def get_worker_health(worker_id: str):
     return stats
 
 @app.get("/system/stats")
-def get_system_stats(db: Session = Depends(get_db)):
+def get_system_stats(
+    db: Session = Depends(get_db),
+    auth: dict = Depends(verify_clerk_token)
+):
+    user_id = auth["user_id"]
+
     total_jobs = db.query(func.count(Job.id)).filter(
-        Job.status != JobStatus.CANCELED
+        Job.status != JobStatus.CANCELED,
+        Job.user_id == user_id  
     ).scalar()
     completed_jobs = db.query(func.count(Job.id)).filter(
-        Job.status == JobStatus.COMPLETED
+        Job.status == JobStatus.COMPLETED,
+        Job.user_id == user_id
     ).scalar()
     failed_jobs = db.query(func.count(Job.id)).filter(
-        Job.status == JobStatus.FAILED
+        Job.status == JobStatus.FAILED,
+        Job.user_id == user_id
     ).scalar()
     pending_jobs = db.query(func.count(Job.id)).filter(
-        Job.status == JobStatus.PENDING
+        Job.status == JobStatus.PENDING,
+        Job.user_id == user_id
     ).scalar()
     running_jobs = db.query(func.count(Job.id)).filter(
-        Job.status == JobStatus.RUNNING
+        Job.status == JobStatus.RUNNING,
+        Job.user_id == user_id
     ).scalar()
     retrying_jobs = db.query(func.count(Job.id)).filter(
-        Job.status == JobStatus.RETRYING
+        Job.status == JobStatus.RETRYING,
+        Job.user_id == user_id
     ).scalar()
     timeout_jobs = db.query(func.count(Job.id)).filter(
-        Job.status == JobStatus.TIMEOUT
+        Job.status == JobStatus.TIMEOUT,
+        Job.user_id == user_id
     ).scalar()
 
     inspect = celery_app.control.inspect()

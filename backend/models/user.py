@@ -8,7 +8,7 @@ class User(base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     clerk_id = Column(String, unique=True, nullable=False, index=True)
-    email = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=True, index=True)
     tier = Column(String, default="free", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)

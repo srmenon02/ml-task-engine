@@ -34,13 +34,15 @@ def get_or_create_user(clerk_id: str, email: str) -> dict:
         if not user:
             user = User(
                 clerk_id=clerk_id,
-                email=email,
+                email=email if email else None, 
                 tier="free",
             )
             db.add(user)
             db.commit()
             db.refresh(user)
         else:
+            if email and not user.email:
+                user.email = email
             user.last_seen_at = datetime.now(timezone.utc)
             db.commit()
 
