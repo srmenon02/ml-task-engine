@@ -1,13 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchSystemStats } from '../api/jobs';
-
+import { useSystemStats } from '../api/jobs';
 export default function Dashboard() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['systemStats'],
-    queryFn: fetchSystemStats,
-    refetchInterval: 5000,
-  });
-
+  const { data, isLoading, error } = useSystemStats();
   return (
     <div style={{ padding: '40px 0' }}>
       {/* Header */}

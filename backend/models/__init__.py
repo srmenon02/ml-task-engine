@@ -2,6 +2,7 @@ from .database import engine, get_db, base, local_session
 from .job import Job, JobStatus, JobPriority
 from .execution import Execution
 from .resource_profile import ResourceProfile
+from .user import User
 from core.audit import AuditLog
 
 def init_db():
@@ -17,5 +18,6 @@ def init_db():
         "JobPriority",
         "Execution",
         "ResourceProfile", 
-        "init_db"
+        "init_db",
+        "User"
     ]

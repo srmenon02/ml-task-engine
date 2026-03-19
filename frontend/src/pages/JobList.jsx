@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchJobs } from "../api/jobs";
+import { useJobs } from "../api/jobs";
 import JobCard from "../components/JobCard";
 import LoadingSpinner from "../components/LoadingSpinner";
 
@@ -25,10 +24,10 @@ export default function JobList() {
   const [statusFilter, setStatusFilter] = useState('');
   const pageSize = 20;
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['jobs', page, statusFilter],
-    queryFn: () => fetchJobs({ page, pageSize, status: statusFilter || undefined }),
-    refetchInterval: 10000,
+  const { data, isLoading, error, refetch } = useJobs({
+    page,
+    pageSize,
+    status: statusFilter || undefined,
   });
 
   const handleFilterChange = (newStatus) => {

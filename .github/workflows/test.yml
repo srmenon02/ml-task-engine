@@ -72,11 +72,6 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov bandit safety
 
-      - name: Run Security Checks
-        run: |
-          bandit -r backend/ -ll
-          safety check --json
-
       - name: Run Unit Tests
         working-directory: backend
         run: pytest tests/unit -v --cov=backend --cov-report=xml

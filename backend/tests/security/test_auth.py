@@ -1,262 +1,323 @@
 import pytest
-from fastapi import status, HTTPException
-from core.auth import verify_api_key, load_api_keys, hash_api_key
+from fastapi import status
+from unittest.mock import Mock, patch, AsyncMock
 from fastapi.security import HTTPAuthorizationCredentials
-from unittest.mock import Mock
+import base64
 import time
 from models import Job, JobStatus
-import base64
+from core.auth import verify_clerk_token
+from api.main import app
+
+MOCK_CLERK_PAYLOAD = {
+    "sub": "user_clerk123",
+    "email": "test@example.com",
+    "iat": int(time.time()),
+    "exp": int(time.time()) + 3600,
+}
+
+MOCK_USER_DICT = {
+    "id": "internal-uuid-123",
+    "clerk_id": "user_clerk123",
+    "email": "test@example.com",
+    "tier": "free",
+}
+
+MOCK_AUTH = {
+    "user_id": MOCK_USER_DICT["id"],
+    "clerk_id": MOCK_CLERK_PAYLOAD["sub"],
+    "email": MOCK_USER_DICT["email"],
+    "tier": "free",
+    "permissions": ["read", "write"],
+}
+
+
 @pytest.mark.security
-class TestAPIKeyValidation:
-    def test_valid_api_key_accepted(self):
-        credentials = Mock(spec = HTTPAuthorizationCredentials)
-        credentials.scheme = "Bearer"
-        credentials.credentials = "test_api_key_user123"
+class TestClerkTokenVerification:
 
-        result = verify_api_key(credentials)
+    @pytest.mark.asyncio
+    async def test_valid_token_accepted(self):
+        credentials = Mock(spec=HTTPAuthorizationCredentials)
+        credentials.credentials = "valid.jwt.token"
 
-        assert result is not None
-        assert "user_id" in result
+        with patch("core.auth.get_jwks", new_callable=AsyncMock) as mock_jwks, \
+             patch("core.auth.jwt.decode", return_value=MOCK_CLERK_PAYLOAD), \
+             patch("core.auth.get_or_create_user", return_value=MOCK_USER_DICT):
 
-    def test_invailid_api_key_rejected(self):
-        credentials = Mock(spec = HTTPAuthorizationCredentials)
-        credentials.scheme = "Bearer"
-        credentials.credentials = "invalid_api_key"
-
-        with pytest.raises(HTTPException) as exc_info:
-            verify_api_key(credentials)
-
-        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-
-    def test_missing_credentials_rejected(self):
-        with pytest.raises(HTTPException) as exc_info:
-            verify_api_key(None)
-
-        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-
-    def test_empty_api_key_rejected(self):
-        credentials = Mock(spec = HTTPAuthorizationCredentials)
-        credentials.scheme = "Bearer"
-        credentials.credentials = ""
-
-        with pytest.raises(HTTPException) as exc_info:
-            verify_api_key(credentials)
-
-        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-    def test_api_key_extracts_user_id(self):
-        credentials = Mock(spec = HTTPAuthorizationCredentials)
-        credentials.scheme = "Bearer"
-        credentials.credentials = "test_api_key_user123"
-
-        result = verify_api_key(credentials)
+            mock_jwks.return_value = {"keys": []}
+            from core.auth import verify_clerk_token as real_verify
+            result = await real_verify(credentials)
 
         assert result is not None
         assert "user_id" in result
-        assert result["user_id"] == "user123"
+        assert result["user_id"] == MOCK_USER_DICT["id"]
 
-    def test_api_key_includes_permissions(self):
-        credentials = Mock(spec = HTTPAuthorizationCredentials)
-        credentials.scheme = "Bearer"
-        credentials.credentials = "test_api_key_user123"
+    @pytest.mark.asyncio
+    async def test_missing_credentials_rejected(self):
+        with patch("core.auth.get_jwks", new_callable=AsyncMock):
+            from core.auth import verify_clerk_token as real_verify
+            from fastapi import HTTPException
+            with pytest.raises(HTTPException) as exc_info:
+                await real_verify(None)
+            assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
-        result = verify_api_key(credentials)
+    @pytest.mark.asyncio
+    async def test_invalid_token_rejected(self):
+        from jose import JWTError
+        credentials = Mock(spec=HTTPAuthorizationCredentials)
+        credentials.credentials = "invalid.jwt.token"
 
-        assert result is not None
+        with patch("core.auth.get_jwks", new_callable=AsyncMock) as mock_jwks, \
+             patch("core.auth.jwt.decode", side_effect=JWTError("bad token")):
+
+            mock_jwks.return_value = {"keys": []}
+            from core.auth import verify_clerk_token as real_verify
+            from fastapi import HTTPException
+            with pytest.raises(HTTPException) as exc_info:
+                await real_verify(credentials)
+            assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.asyncio
+    async def test_token_returns_correct_shape(self):
+        credentials = Mock(spec=HTTPAuthorizationCredentials)
+        credentials.credentials = "valid.jwt.token"
+
+        with patch("core.auth.get_jwks", new_callable=AsyncMock) as mock_jwks, \
+             patch("core.auth.jwt.decode", return_value=MOCK_CLERK_PAYLOAD), \
+             patch("core.auth.get_or_create_user", return_value=MOCK_USER_DICT):
+
+            mock_jwks.return_value = {"keys": []}
+            from core.auth import verify_clerk_token as real_verify
+            result = await real_verify(credentials)
+
+        assert "user_id" in result
+        assert "clerk_id" in result
+        assert "email" in result
+        assert "tier" in result
         assert "permissions" in result
         assert isinstance(result["permissions"], list)
 
+    @pytest.mark.asyncio
+    async def test_token_includes_read_write_permissions(self):
+        credentials = Mock(spec=HTTPAuthorizationCredentials)
+        credentials.credentials = "valid.jwt.token"
+
+        with patch("core.auth.get_jwks", new_callable=AsyncMock) as mock_jwks, \
+             patch("core.auth.jwt.decode", return_value=MOCK_CLERK_PAYLOAD), \
+             patch("core.auth.get_or_create_user", return_value=MOCK_USER_DICT):
+
+            mock_jwks.return_value = {"keys": []}
+            from core.auth import verify_clerk_token as real_verify
+            result = await real_verify(credentials)
+
+        assert "read" in result["permissions"]
+        assert "write" in result["permissions"]
+
+
 @pytest.mark.security
 class TestBearerTokenFormat:
-    def test_accepts_bearer_token(self, client):
+
+    @pytest.fixture(autouse=True)
+    def remove_auth_override(self):
+        app.dependency_overrides.pop(verify_clerk_token, None)
+        yield
+
+    def test_accepts_valid_bearer_token(self, client):
+        async def override(credentials=None):
+            return MOCK_AUTH
+        app.dependency_overrides[verify_clerk_token] = override
+
         response = client.get(
             "/health",
-            headers = {"Authorization": "Bearer test_api_key_user123"}
+            headers={"Authorization": "Bearer valid.jwt.token"}
         )
-
         assert response.status_code == status.HTTP_200_OK
 
     def test_rejects_basic_auth(self, client):
         creds = base64.b64encode(b"user:pass").decode()
         response = client.get(
             "/jobs",
-            headers = {"Authorization": f"Basic {creds}"}
+            headers={"Authorization": f"Basic {creds}"}
         )
-
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_rejects_malformed_bearer(self, client):
-        malformed_tokens = [
-            "Bearer",
-            "Bearer ",
-            "Bearertest_api_key_user123",
-            "Bearer test_api_key_user123 extra"
-        ]
+    def test_rejects_missing_auth_header(self, client):
+        response = client.get("/jobs")
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-        for token in malformed_tokens:
+
+@pytest.mark.security
+class TestAuthorizationChecks:
+
+    def test_user_can_only_see_own_jobs(self, client, test_db):
+        job_user1 = Job(
+            job_type="train_sklearn_model",
+            config={"n_estimators": 100},
+            priority=5,
+            user_id="internal-uuid-user1",
+        )
+        job_user2 = Job(
+            job_type="train_sklearn_model",
+            config={"n_estimators": 100},
+            priority=5,
+            user_id="internal-uuid-user2",
+        )
+        test_db.add_all([job_user1, job_user2])
+        test_db.commit()
+
+        auth_user1 = {
+            "user_id": "internal-uuid-user1",
+            "clerk_id": "user_clerk_1",
+            "email": "user1@example.com",
+            "tier": "free",
+            "permissions": ["read", "write"],
+        }
+
+        async def override_as_user1(credentials=None):
+            return auth_user1
+
+        app.dependency_overrides[verify_clerk_token] = override_as_user1
+
+        try:
             response = client.get(
-                "/jobs",
-                headers = {"Authorization": token}
+                f"/jobs/{job_user1.id}",
+                headers={"Authorization": "Bearer valid.jwt.token"}
             )
+            assert response.status_code == status.HTTP_200_OK
 
-            assert response.status_code == status.HTTP_401_UNAUTHORIZED
+            response = client.get(
+                f"/jobs/{job_user2.id}",
+                headers={"Authorization": "Bearer valid.jwt.token"}
+            )
+            assert response.status_code in [
+                status.HTTP_403_FORBIDDEN,
+                status.HTTP_401_UNAUTHORIZED,
+            ]
+        finally:
+            app.dependency_overrides.pop(verify_clerk_token, None)
+
+    def test_cannot_impersonate_other_users(self, client):
+        response = client.post(
+            "/jobs",
+            json={
+                "job_type": "train_sklearn_model",
+                "config": {"n_estimators": 100},
+                "user_id": "victim-uuid",
+            },
+            headers={"Authorization": "Bearer valid.jwt.token"}
+        )
+
+        if response.status_code == status.HTTP_201_CREATED:
+            assert response.json().get("user_id") != "victim-uuid"
 
 @pytest.mark.security
 class TestAPIKeySecurity:
+
+    @pytest.fixture(autouse=True)
+    def remove_auth_override(self):
+        app.dependency_overrides.pop(verify_clerk_token, None)
+        yield
+
+    def test_api_key_not_accepted_as_clerk_token(self, client):
+        response = client.get(
+            "/jobs",
+            headers={"Authorization": "Bearer test_api_key_user123"}
+        )
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
     def test_api_key_not_in_url(self, client):
         response = client.get("/jobs?api_key=test_api_key_user123")
-        assert response.status_code in [status.HTTP_403_FORBIDDEN, status.HTTP_401_UNAUTHORIZED]
+        assert response.status_code in [
+            status.HTTP_403_FORBIDDEN,
+            status.HTTP_401_UNAUTHORIZED,
+        ]
 
-    def test_api_key_not_in_query_string(self, client, auth_headers):
-        response = client.get("/jobs?page-1", headers=auth_headers)
-        assert "api_key" not in str(response.url).lower()
-
-    @pytest.mark.parametrize("suspicious_key", [
+    @pytest.mark.parametrize("suspicious_token", [
         "'; DROP TABLE users; --",
         "<script>alert('xss')</script>",
         "../../../etc/passwd",
         "__import__('os').system('ls')",
+        "",
+        "Bearer",
+        "null",
     ])
-    def test_api_key_injection_attempts_blocked(self, suspicious_key):
-        credentials = Mock(spec = HTTPAuthorizationCredentials)
-        credentials.scheme = "Bearer"
-        credentials.credentials = suspicious_key
+    @pytest.mark.asyncio
+    async def test_malicious_token_rejected(self, suspicious_token):
+        from jose import JWTError
+        credentials = Mock(spec=HTTPAuthorizationCredentials)
+        credentials.credentials = suspicious_token
 
-        with pytest.raises(HTTPException) as exc_info:
-            verify_api_key(credentials)
+        with patch("core.auth.get_jwks", new_callable=AsyncMock) as mock_jwks, \
+             patch("core.auth.jwt.decode", side_effect=JWTError("invalid")):
 
-        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-
-    def test_api_key_timing_attack_resistance(self):
-        credentials_valid = Mock(spec = HTTPAuthorizationCredentials)
-        credentials_valid.scheme = "Bearer"
-        credentials_valid.credentials = "test_api_key_user123"
-
-        credentials_invalid = Mock(spec = HTTPAuthorizationCredentials)
-        credentials_invalid.scheme = "Bearer"
-        credentials_invalid.credentials = "invalid_api_key"
-
-        start_time_valid = time.time()
-        try:
-            verify_api_key(credentials_valid)
-        except:
-            pass
-        verify_api_key(credentials_valid)
-        valid_time = time.time() - start_time_valid
-
-        start_time_invalid = time.time()
-        try:
-            verify_api_key(credentials_invalid)
-        except:
-            pass
-        invalid_time = time.time() - start_time_invalid
-
-        assert abs(invalid_time - valid_time) < 0.1
-
-@pytest.mark.security
-class TestAuthorizationChecks:
-    def test_user_can_only_see_own_jobs(self, client, test_db):
-        job_user1 = Job(
-            job_type = "train_sklearn_model",
-            config = {
-                "n_estimators": 100,
-            },
-            priority = 5,
-            user_id = "user1"
-        )
-
-        job_user2 = Job(
-            job_type = "train_sklearn_model",
-            config = {
-                "n_estimators": 100,
-            },
-            priority = 5,
-            user_id = "user2"
-        )
-
-        test_db.add_all([job_user1, job_user2])
-        test_db.commit()
-
-        headers_user1 = {"Authorization": "Bearer test_api_key_user1"}
-        response = client.get(f"/jobs/{job_user1.id}", headers=headers_user1)
-        assert response.status_code == status.HTTP_200_OK
-
-        response = client.get(f"/jobs/{job_user2.id}", headers=headers_user1)
-        assert response.status_code in [status.HTTP_403_FORBIDDEN, status.HTTP_401_UNAUTHORIZED]
-
-    def test_permission_based_access(self):
-        credentials = Mock(spec = HTTPAuthorizationCredentials)
-        credentials.scheme = "Bearer"
-        credentials.credentials = "test_api_key_user123"
-
-        result = verify_api_key(credentials)
-
-        assert "read" in result["permissions"]
-        assert "write" in result["permissions"]
-
-    def test_cannot_impersonate_other_users(self, client, auth_headers):
-        response = client.post(
-            "/jobs",
-            json = {
-                "job_type": "train_sklearn_model",
-                "config": {
-                    "n_estimators": 100,
-                },
-                "user_id": "victim_user"
-            },
-            headers = auth_headers
-        )
-
-        if response.status_code == status.HTTP_201_CREATED:
-            job_data = response.json()
-            assert "user_id" not in job_data
+            mock_jwks.return_value = {"keys": []}
+            from core.auth import verify_clerk_token as real_verify
+            from fastapi import HTTPException
+            with pytest.raises(HTTPException) as exc_info:
+                await real_verify(credentials)
+            assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 @pytest.mark.security
 class TestSessionManagement:
-    def test_api_key_does_not_expire_during_request(self, client, auth_headers):
-        for _ in range(5):
-            response = client.get("/health", headers = auth_headers)
-            assert "X-Correlation-ID" in response.headers
 
-    def test_correlation_id_preservd_across_requests(self, client, auth_headers):
+    def test_correlation_id_preserved_across_requests(self, client):
         correlation_id = "test-correlation-123"
-        headers = {
-            **auth_headers,
-            "X-Correlation-ID": correlation_id
-        }
-
-        response = client.get("/health", headers = headers)
-
+        response = client.get(
+            "/health",
+            headers={
+                "Authorization": "Bearer valid.jwt.token",
+                "X-Correlation-ID": correlation_id,
+            }
+        )
         assert response.headers.get("X-Correlation-ID") == correlation_id
 
+    def test_multiple_requests_with_same_token(self, client):
+        for _ in range(5):
+            response = client.get(
+                "/health",
+                headers={"Authorization": "Bearer valid.jwt.token"}
+            )
+            assert response.status_code == status.HTTP_200_OK
+
 @pytest.mark.security
-class TestAPIKeyManagement:
-    def test_load_api_keys_from_env(self, monkeypatch):
-        monkeypatch.setenv("API_KEYS", "key1_user1, key2_user2, key3_user3")
+class TestUserProvisioning:
 
-        keys = load_api_keys()
+    def test_new_user_created_on_first_login(self):
+        from core.auth import get_or_create_user
+        from unittest.mock import MagicMock
 
-        assert len(keys) == 3
-        assert "key1_user1" in keys
-        assert "key2_user2" in keys
-        assert "key3_user3" in keys
+        mock_db = MagicMock()
+        mock_db.query.return_value.filter.return_value.first.return_value = None
 
-        assert keys["key1_user1"]["user_id"] == "user1"
-        assert keys["key2_user2"]["user_id"] == "user2" 
-        assert keys["key3_user3"]["user_id"] == "user3"
+        with patch("core.auth.local_session", return_value=mock_db):
+            mock_user = MagicMock()
+            mock_user.id = "new-uuid"
+            mock_user.clerk_id = "user_new123"
+            mock_user.email = "new@example.com"
+            mock_user.tier = "free"
+            mock_db.refresh.side_effect = lambda u: None
 
-    def test_api_key_hash_consistent(self):
-        key = "test_api_key_user123"
+            with patch("core.auth.User", return_value=mock_user):
+                result = get_or_create_user("user_new123", "new@example.com")
 
-        hash1 = hash_api_key(key)
-        hash2 = hash_api_key(key)
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called()
 
-        assert hash1 == hash2
+    def test_existing_user_last_seen_updated(self):
+        from core.auth import get_or_create_user
+        from unittest.mock import MagicMock
 
-    def test_api_key_hash_unique(self):
-        key1 = "test_api_key_user123"
-        key2 = "test_api_key_user456"
+        mock_existing_user = MagicMock()
+        mock_existing_user.id = "existing-uuid"
+        mock_existing_user.clerk_id = "user_existing123"
+        mock_existing_user.email = "existing@example.com"
+        mock_existing_user.tier = "free"
+        mock_existing_user.last_seen_at = None
 
-        hash1 = hash_api_key(key1)
-        hash2 = hash_api_key(key2)
+        mock_db = MagicMock()
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_existing_user
 
-        assert hash1 != hash2
+        with patch("core.auth.local_session", return_value=mock_db):
+            get_or_create_user("user_existing123", "existing@example.com")
+
+        assert mock_existing_user.last_seen_at is not None
+        mock_db.commit.assert_called()

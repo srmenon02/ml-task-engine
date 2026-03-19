@@ -1,29 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchJob, cancelJob } from '../api/jobs';
+import { useJob, useCancelJob } from '../api/jobs';
 import JobStatusBadge from '../components/JobStatusBadge';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function JobDetail() {
   const { id } = useParams();
-  const queryClient = useQueryClient();
-
-  const { data: job, isLoading, error } = useQuery({
-    queryKey: ['job', id],
-    queryFn: () => fetchJob(id),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === 'running' || status === 'pending' ? 5000 : false;
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: () => cancelJob(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['job', id]);
-      queryClient.invalidateQueries(['jobs']);
-    },
-  });
+  const { data: job, isLoading, error } = useJob(id);
+  const cancelMutation = useCancelJob(id);
 
   const formatDate = (ds) => {
     if (!ds) return '—';
