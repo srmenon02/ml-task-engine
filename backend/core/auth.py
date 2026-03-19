@@ -1,75 +1,87 @@
-from fastapi import HTTPException, Security, Depends
+import httpx
+from jose import jwt, JWTError
+from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Dict
-import json
-import secrets
-import hashlib
-import structlog
-import os
-from dotenv import load_dotenv
-from pathlib import Path
-from dotenv import load_dotenv
-from dataclasses import dataclass
-
-BASE_DIR = Path(__file__).resolve().parents[1]
-ENV_PATH = BASE_DIR / ".env"
-
-if ENV_PATH.exists():
-    load_dotenv(ENV_PATH)
-else:
-    print(".env not found, using OS environment variables")
-
-logger = structlog.get_logger()
+from functools import lru_cache
+import time
+from models import local_session
+from models.user import User
+from datetime import datetime, timezone
 
 security = HTTPBearer(auto_error=False)
 
-def load_api_keys() -> Dict:
-    keys_load = os.getenv("API_KEYS")
-    keys = {}
-    for key in keys_load.split(","):
-        key = key.strip()
-        if key:
-            user_id = key.split("_")[-1] if "_" in key else "default_user"
-            keys[key] = {
-                "user_id": user_id,
-                "permissions": ["read", "write"],
-            }
-            
-    return keys
+CLERK_JWKS_URL = "https://creative-amoeba-82.clerk.accounts.dev/.well-known/jwks.json"
 
-VALID_API_KEYS = load_api_keys()
+_jwks_cache = {"keys": None, "fetched_at": 0}
 
-def hash_api_key(api_key: str) -> str:
-    return hashlib.sha256(api_key.encode()).hexdigest()
+async def get_jwks():
+    now = time.time()
+    # Refresh every 60 minutes
+    if _jwks_cache["keys"] and now - _jwks_cache["fetched_at"] < 3600:
+        return _jwks_cache["keys"]
 
-def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> Dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(CLERK_JWKS_URL)
+        _jwks_cache["keys"] = response.json()
+        _jwks_cache["fetched_at"] = now
+        return _jwks_cache["keys"]
+    
+def get_or_create_user(clerk_id: str, email: str) -> dict:
+    db = local_session()
+    try:
+        user = db.query(User).filter(User.clerk_id == clerk_id).first()
+
+        if not user:
+            user = User(
+                clerk_id=clerk_id,
+                email=email,
+                tier="free",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            user.last_seen_at = datetime.now(timezone.utc)
+            db.commit()
+
+        return {
+            "id": user.id,
+            "clerk_id": user.clerk_id,
+            "email": user.email,
+            "tier": user.tier,
+        }
+    finally:
+        db.close()
+
+async def verify_clerk_token(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+) -> dict:
     if credentials is None:
         raise HTTPException(status_code=401, detail="Unauthenticated")
 
-    if credentials.scheme.lower() != "bearer":
-        raise HTTPException(status_code=401, detail="Invalid auth scheme")
+    token = credentials.credentials
 
-    api_key = credentials.credentials
+    try:
+        jwks = await get_jwks()
+        payload = jwt.decode(
+            token,
+            jwks,
+            algorithms=["RS256"],
+            options={"verify_aud": False}
+        )
 
-    if not api_key:
-        raise HTTPException(status_code=401, detail="Missing API key")
+        user = get_or_create_user(
+            clerk_id=payload["sub"],
+            email=payload.get("email", ""),
+        )
 
-    if api_key not in VALID_API_KEYS:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
+        return {
+            "user_id": user["id"],
+            "clerk_id": payload["sub"],
+            "email": user["email"],
+            "tier": user["tier"],
+            "permissions": ["read", "write"],
+        }
 
-    return VALID_API_KEYS[api_key]
-
-@dataclass
-class CurrentUser:
-    user_id: str
-    is_admin: bool = False
-
-def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> CurrentUser:
-    user_info = verify_api_key(credentials)
-
-    is_admin = user_info["user_id"].startswith("admin")
-
-    return CurrentUser(
-        user_id = user_info["user_id"],
-        is_admin = is_admin
-    )
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail="Invalid token")

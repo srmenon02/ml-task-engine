@@ -26,7 +26,7 @@ from core.accuracy_tracker import calculate_prediction_accuracy
 from core.scheduler import get_scheduler
 from core.worker_health import get_health_monitor
 from core.security import get_validator, get_rate_limiter_dep
-from core.auth import verify_api_key, get_current_user
+from core.auth import verify_clerk_token
 from core.audit import log_audit_event
 import uuid
 from core.logging_config import get_correlation_id, set_correlation_id, RequestLogger
@@ -150,8 +150,6 @@ class SecurityHeadersMiddleWare(BaseHTTPMiddleware):
 
         return response
 
-app.add_middleware(SecurityHeadersMiddleWare)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -215,13 +213,13 @@ def root():
 def create_job(
     job_data: JobCreate,
     request: Request,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_clerk_token),
     db: Session = Depends(get_db),
     rate_limiter = Depends(get_rate_limiter_dep)
     ):
     job_data.user_id = auth["user_id"]
     request.state.user_id = auth["user_id"]
-    request.state.rate_limter = rate_limiter
+    request.state.rate_limiter = rate_limiter
     logger.info("job.create requested", job_type=job_data.job_type, user_id=job_data.user_id)
 
     client_ip = request.client.host if request.client else "unknown"
@@ -315,7 +313,7 @@ def create_job(
 @app.get("/jobs/{job_id}", response_model=JobResponse)
 def get_job(
     job_id: int,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_clerk_token),
     db: Session = Depends(get_db)
     ):
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -350,7 +348,7 @@ def cancel_job(
     job_id: int,
     cancelled_by: str = "api_user",
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(verify_clerk_token)
 ):
     job = db.get(Job, job_id)
 
@@ -503,25 +501,6 @@ def evaluate_predictor():
 @app.get("/predictor/accuracy")
 def get_prediction_accuracy():
     return calculate_prediction_accuracy()
-
-
-def get_rate_limiter_for_middleware(rate_limiter=Depends(get_rate_limiter_dep)):
-    return rate_limiter
-
-@app.middleware("http")
-async def add_rate_limit_headers(request: Request, call_next):
-    response = await call_next(request)
-
-    if hasattr(request.state, "user_id") and hasattr(request.state, "rate_limiter"):
-        rate_limiter = get_rate_limiter_for_middleware()
-        usage = rate_limiter.get_usage(request.state.user_id)
-
-        if "error" not in usage:
-            response.headers["X-RateLimit-Limit"] = str(usage["requests_limit"])
-            response.headers["X-RateLimit-Remaining"] = str(usage["requests_remaining"])
-            response.headers["X-RateLimit-Reset"] = str(usage["window_seconds"])
-
-    return response
 
 @app.get("/admin/rate-limit/{user_id}")
 def get_rate_limit_usage(user_id: str):

@@ -46,3 +46,6 @@ python-multipart==0.0.22
 pydantic[email]>=2.0.0
 pbr==7.0.3
 starlette==0.52.1
+
+python-jose[cryptography]==3.5.0
+httpx==0.25.2

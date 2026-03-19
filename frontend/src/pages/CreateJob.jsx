@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createJob } from "../api/jobs";
+import { useCreateJob } from "../api/jobs";
 import { useNavigate } from "react-router-dom";
 
 const MODELS = [
@@ -50,7 +49,7 @@ const WEIGHT_COLORS = {
 
 export default function CreateJob() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const mutation = useCreateJob();
 
   const [formData, setFormData] = useState({
     n_estimators: 100,
@@ -59,26 +58,19 @@ export default function CreateJob() {
     model: 'RandomForest',
   });
 
-  const mutation = useMutation({
-    mutationFn: () =>
-      createJob({
-        job_type: 'train_sklearn_model',
-        config: {
-          model: formData.model,
-          n_estimators: Number(formData.n_estimators),
-          dataset_rows: Number(formData.dataset_rows),
-        },
-        priority: Number(formData.priority),
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(['jobs']);
-      navigate(`/jobs/${data.id}`);
-    },
-  });
-
   const handleSubmit = (e) => {
     e.preventDefault();
-    mutation.mutate();
+    mutation.mutate({
+      job_type: 'train_sklearn_model',
+      config: {
+        model: formData.model,
+        n_estimators: Number(formData.n_estimators),
+        dataset_rows: Number(formData.dataset_rows),
+      },
+      priority: Number(formData.priority),
+    }, {
+      onSuccess: (data) => navigate(`/jobs/${data.id}`),
+    });
   };
 
   const complexityScore = Math.min(
@@ -313,18 +305,19 @@ function FieldLabel({ children }) {
 
 function NumberField({ label, description, value, min, max, onChange, delay = 0 }) {
   return (
-    <div style={{
-      backgroundColor: 'var(--bg-surface)',
-      border: '1px solid var(--border-dim)',
-      borderRadius: 'var(--radius-md)',
-      padding: '16px',
-      transition: 'border-color 0.15s ease',
-      animation: 'fadeSlideUp 0.5s ease forwards',
-      animationDelay: `${delay}s`,
-      opacity: 0,
-    }}
-    onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--border-bright)'}
-    onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border-dim)'}
+    <div
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        border: '1px solid var(--border-dim)',
+        borderRadius: 'var(--radius-md)',
+        padding: '16px',
+        transition: 'border-color 0.15s ease',
+        animation: 'fadeSlideUp 0.5s ease forwards',
+        animationDelay: `${delay}s`,
+        opacity: 0,
+      }}
+      onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--border-bright)'}
+      onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border-dim)'}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
         <div>

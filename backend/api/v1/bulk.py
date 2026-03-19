@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 
 from models import get_db
-from core.auth import verify_api_key
+from core.auth import verify_clerk_token
 from core.bulk_operations import bulk_submit_jobs, bulk_cancel_jobs, BulkJobResult
 from core.rate_limiter import TieredRateLimiter, UserTier
 
@@ -44,7 +44,7 @@ class BulkCancelRequest(BaseModel):
 @router.post("/jobs", response_model = BulkJobResult, status_code = status.HTTP_201_CREATED)
 def submit_bulk_jobs(
     request: BulkJobSubmitRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_clerk_token),
     db: Session = Depends(get_db)
 ):
     rate_limiter = TieredRateLimiter()
@@ -85,7 +85,7 @@ def submit_bulk_jobs(
 @router.post("/jobs/cancel")
 def cancel_bulk_jobs(
     request: BulkCancelRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_clerk_token),
     db: Session = Depends(get_db)
 ):
     if len(request.job_ids) > 100:

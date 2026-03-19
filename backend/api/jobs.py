@@ -5,7 +5,7 @@ from typing import List
 from models import get_db, Job, JobStatus
 from api.pagination import PaginationParams, PaginatedResponse, paginate_query
 from api.models import JobResponse
-from core.auth import verify_api_key
+from core.auth import verify_clerk_token
 from core.filtering import JobFilters, apply_job_filters, DateRangePreset, get_date_range_from_preset
 from typing import Optional, List
 from datetime import datetime
@@ -26,7 +26,7 @@ def list_jobs(
     date_range: Optional[str] = Query(None, description = "Preset: last_hour, last_24h, last_7d, last_30d"),
     search: Optional[str] = Query(None, description = "Search in job config"),
 
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_clerk_token),
     db: Session = Depends(get_db)
 ):
     params = PaginationParams(page = page, page_size = page_size)
