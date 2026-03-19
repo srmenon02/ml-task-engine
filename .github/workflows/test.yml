@@ -75,7 +75,7 @@ jobs:
       - name: Run Security Checks
         run: |
           bandit -r backend/ -ll
-          safety scan --exit-code 64
+          pip-audit --severity medium
 
       - name: Run Unit Tests
         working-directory: backend
