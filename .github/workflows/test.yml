@@ -75,7 +75,7 @@ jobs:
       - name: Run Security Checks
         run: |
           bandit -r backend/ -ll
-          safety check --json
+          safety scan --exit-code 64
 
       - name: Run Unit Tests
         working-directory: backend
