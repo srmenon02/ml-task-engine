@@ -6,6 +6,7 @@ import redis
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
+from unittest.mock import patch, AsyncMock
 
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
@@ -133,9 +134,27 @@ def client(override_get_db, mock_local_session):
         yield test_client
     app.dependency_overrides.clear()
 
+MOCK_AUTH = {
+    "user_id": "test-internal-uuid",
+    "clerk_id": "user_test123",
+    "email": "test@example.com",
+    "tier": "free",
+    "permissions": ["read", "write"],
+}
 @pytest.fixture
 def auth_headers():
-    return {"Authorization": "Bearer test_api_key_user123"}
+    return {"Authorization": "Bearer test.jwt.token"}
+
+from core.auth import verify_clerk_token
+
+@pytest.fixture(autouse=True)
+def mock_clerk_auth():
+    async def override_verify_clerk_token(credentials=None):
+        return MOCK_AUTH
+    
+    app.dependency_overrides[verify_clerk_token] = override_verify_clerk_token
+    yield
+    app.dependency_overrides.pop(verify_clerk_token, None)
 
 @pytest.fixture
 def admin_headers():
