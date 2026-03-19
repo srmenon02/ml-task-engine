@@ -1,3 +1,4 @@
+-i https://pkgs.safetycli.com/repository/personal-cf8b4/project/ml-task-engine/pypi/simple/
 fastapi
 uvicorn[standard]
 pydantic
