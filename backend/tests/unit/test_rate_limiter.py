@@ -43,10 +43,7 @@ class TestRedisRateLimiter:
 
     def test_ip_based_rate_limiting(self, redis_rate_limiter, mock_redis):
         pipeline = mock_redis.pipeline.return_value
-        pipeline.execute.side_effect = [
-            [0, 50, True, True],    
-            [501, 500, True, True]    
-        ]
+        pipeline.execute.return_value = [0, 50, 0, 501, 0, 50]
 
         allowed, info = redis_rate_limiter.is_allowed("user123", ip_address="192.168.1.1")
 
@@ -54,15 +51,11 @@ class TestRedisRateLimiter:
         assert info["limit_type"] == "ip"
 
     def test_global_rate_limit(self, redis_rate_limiter, mock_redis):
-        user_pipe = MagicMock()
-        user_pipe.execute.return_value = [None, 50, None, None]
-
-        global_pipe = MagicMock()
-        global_pipe.execute.return_value = [None, 1001, None, None]
-
-        mock_redis.pipeline.side_effect = [user_pipe, global_pipe]
+        pipeline = mock_redis.pipeline.return_value
+        pipeline.execute.return_value = [0, 50, 0, 1001]
 
         allowed, info = redis_rate_limiter.is_allowed("user123")
+
         assert allowed is False
         assert info["limit_type"] == "global"
 
@@ -85,7 +78,9 @@ class TestRedisRateLimiter:
         mock_redis.delete.assert_called()
 
     def test_fallback_on_redis_error(self, redis_rate_limiter, mock_redis):
-        mock_redis.pipeline.side_effect = redis_lib.RedisError("Connection Failed")
+        pipeline = mock_redis.pipeline.return_value
+        pipeline.execute.side_effect = redis_lib.RedisError("Connection Failed")
+
         allowed, info = redis_rate_limiter.is_allowed("user123")
         assert allowed is True
 
