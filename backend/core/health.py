@@ -6,6 +6,8 @@ from sqlalchemy import text
 from models import local_session
 import redis as redis_lib
 from workers.celery_app import celery_app
+import time
+
 
 logger = structlog.get_logger()
 
@@ -13,6 +15,9 @@ class HealthStatus:
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
+
+_redis_health_cache = {"result": None, "checked_at": 0}
+_REDIS_CACHE_TTL = 30
 
 class HealthCheck:
     def check_database() -> Dict:
@@ -41,35 +46,32 @@ class HealthCheck:
             }
 
     def check_redis(redis_url: str = "redis://localhost:6379/0") -> Dict:
+        now = time.time()
+        if now - _redis_health_cache["checked_at"] < _REDIS_CACHE_TTL:
+            return _redis_health_cache["result"]
+        
         try:
-            client = redis_lib.from_url(redis_url, socket_timeout = 5)
+            client = redis_lib.from_url(redis_url, socket_timeout=5)
             start = datetime.now(timezone.utc)
-
-            client.ping()
-
+            client.ping()  # ping only, not INFO
             latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
-
-            info = client.info()
-
             client.close()
-
-            return {
+            
+            result = {
                 "status": HealthStatus.HEALTHY,
                 "latency_ms": round(latency_ms, 2),
-                "version": info.get("redis_version"),
-                "connected_clients": info.get("connected_clients"),
-                "used_memory_mb": round(info.get("used_memory", 0) / (1024 * 1024), 2),
-                "info": info,
                 "message": "redis connection successful"
             }
-        
         except Exception as e:
-            logger.error(f"health redis check failed: {e}")
-            return {
+            result = {
                 "status": HealthStatus.UNHEALTHY,
-                "error": e,
+                "error": str(e),
                 "message": "Redis connection failed"
             }
+        
+        _redis_health_cache["result"] = result
+        _redis_health_cache["checked_at"] = now
+        return result
         
     def check_workers() -> Dict:
         try:

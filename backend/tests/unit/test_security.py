@@ -77,11 +77,9 @@ class TestRateLimiter:
         assert allowed is True
         assert info["allowed"] is True
     
-    @pytest.mark.security
     def test_rate_limit_per_ip(self, rate_limiter, mock_redis):
-        """Rate limit by IP address to prevent distributed DoS."""
         pipeline = mock_redis.pipeline.return_value
-        pipeline.execute.return_value = [0, 10, True, True]
+        pipeline.execute.return_value = [0, 10, 0, 10, 0, 10]
         
         allowed, info = rate_limiter.is_allowed("user123", ip_address="192.168.1.1")
         
