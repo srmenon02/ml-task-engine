@@ -12,19 +12,18 @@ from core.security import get_rate_limiter_dep
 class TestUserRateLimiting:
     def test_rate_limit_headers_present(self, client, auth_headers, override_rate_limiter):
         pipeline = override_rate_limiter.redis.pipeline.return_value
-        pipeline.execute.return_value = [0, 50, True, True]
+        pipeline.execute.return_value = [0, 50, 0, 50, 0, 50]
 
         response = client.post(
             "/jobs",
-            json = {
+            json={
                 "job_type": "train_sklearn_model",
                 "config": {"n_estimators": 100},
                 "priority": 5
             },
-            headers = auth_headers
+            headers=auth_headers
         )
 
-        print(f"Headers: {response.headers}")
         assert "X-RateLimit-Limit" in response.headers or response.status_code == 429
 
     
