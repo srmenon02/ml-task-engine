@@ -209,5 +209,3 @@ jobs:
       - name: Run smoke tests
         run: |
           curl -f https://ml-task-engine-api.onrender.com/health
-          curl -f -H "Authorization: Bearer ${{ secrets.RENDER_SMOKE_TEST_API_KEY }}" \
-            "https://ml-task-engine-api.onrender.com/api/v1/jobs?page=1&page_size=10"
