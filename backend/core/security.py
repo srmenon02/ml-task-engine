@@ -218,47 +218,42 @@ class RedisRateLimiter:
         hashed = hashlib.sha256(identifier.encode()).hexdigest()[:16]
         return f"ratelimit:{limit_type}:{hashed}"
     
-    def is_allowed(
-            self,
-            user_id: str,
-            ip_address: Optional[str] = None,
-    ) -> tuple[bool, Dict[str, Any]]:
-        now = datetime.now(timezone.utc)
-        timestamp = now.timestamp()
-
-        checks = [
-            ("user", user_id, self.limits["user"]),
-        ]
-
+    def is_allowed(self, user_id, ip_address=None):
+        now = datetime.now(timezone.utc).timestamp()
+        
+        pipe = self.redis.pipeline()
+        
+        checks = [("user", user_id, self.limits["user"])]
         if ip_address:
             checks.append(("ip", ip_address, self.limits["ip"]))
-
         checks.append(("global", "global", self.limits["global"]))
-
+        
         for limit_type, identifier, config in checks:
-            allowed, remaining = self._check_limit(
-                limit_type,
-                identifier,
-                timestamp,
-                config["requests"],
-                config["window"],
-            )
-
-            if not allowed:
-                logger.warning(
-                    "RedisRateLimiter limit exceeded",
-                    limit_type = limit_type,
-                    identifier = identifier if limit_type == "global" else "redacted",
-                    limit = config["requests"],
-                    window = config["window"],
-                )
-
+            key = self._get_key(limit_type, identifier)
+            window_start = now - config["window"]
+            pipe.zremrangebyscore(key, 0, window_start)
+            pipe.zcard(key)
+        
+        try:
+            results = pipe.execute()
+        except redis.RedisError:
+            return True, {"allowed": True}
+        
+        write_pipe = self.redis.pipeline()
+        for i, (limit_type, identifier, config) in enumerate(checks):
+            current_count = results[i * 2 + 1]
+            if current_count >= config["requests"]:
                 return False, {
                     "limit_type": limit_type,
                     "limit": config["requests"],
                     "window": config["window"],
                     "retry_after": config["window"],
                 }
+            key = self._get_key(limit_type, identifier)
+            write_pipe.zadd(key, {f"{now}": now})
+            write_pipe.expire(key, config["window"] * 2)
+        
+        write_pipe.execute()
         return True, {"allowed": True}
     
     def _check_limit(
@@ -335,11 +330,24 @@ _rate_limiter = None
 def get_validator() -> SecurityValidator:
     return _validator
 
+_redis_pool = None
+
+def get_redis_pool():
+    global _redis_pool
+    if _redis_pool is None:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        _redis_pool = redis.ConnectionPool.from_url(
+            redis_url,
+            max_connections=10,
+            decode_responses=True,
+        )
+    return _redis_pool
+
 def get_rate_limiter() -> RedisRateLimiter:
     global _rate_limiter
     if _rate_limiter is None:
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        _rate_limiter = RedisRateLimiter(redis_url = redis_url)
+        client = redis.Redis(connection_pool=get_redis_pool())
+        _rate_limiter = RedisRateLimiter(redis_client=client)
     return _rate_limiter
 
 def get_rate_limiter_dep() -> RedisRateLimiter:
